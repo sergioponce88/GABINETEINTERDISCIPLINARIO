@@ -16,9 +16,31 @@ from reportlab.platypus import (
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
+def _buscar_logo(nombre):
+  """Busca el archivo (sin distinguir mayúsculas) en la raíz o en carpetas comunes."""
+  for carpeta in ('.', 'assets', 'imagenes', 'img'):
+    if os.path.isdir(carpeta):
+      for f in os.listdir(carpeta):
+        if f.lower() == nombre.lower():
+          return os.path.join(carpeta, f)
+  return None
+
+
+try:
+  from PIL import Image as _PILImage
+
+  _ruta_icono = _buscar_logo('GABINETE.png')
+  if _ruta_icono:
+    _icono = _PILImage.open(_ruta_icono).convert('RGBA')
+    _icono.thumbnail((128, 128))
+  else:
+    _icono = '🛡'
+except Exception:
+  _icono = '🛡'
+
 st.set_page_config(
     page_title="Gabinete Medico | I.E.S.P. G.J.F.S.M.",
-    page_icon="🛡",
+    page_icon=_icono,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -84,6 +106,8 @@ label, .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInpu
   box-shadow: 0 8px 24px rgba(37,99,235,0.45); }
 .brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF; letter-spacing: 0.01em; line-height: 1.15; }
 .brand-sub { font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; }
+.brand-logo.has-img { background: none; box-shadow: none; width: 54px; height: 58px; }
+.brand-logo img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
 .nav-label { font-size: 0.68rem; font-weight: 700; color: #5F6C88; text-transform: uppercase;
   letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }
 .side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px;
@@ -133,6 +157,11 @@ label, .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInpu
   font-size: 0.76rem; font-weight: 700; border: 1px solid rgba(16,185,129,0.4); color: #6EE7B7; background: rgba(16,185,129,0.1); }
 .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(16,185,129,0.2); }
 .hero-date { font-size: 0.9rem; font-weight: 600; color: #C7D2EE; }
+
+.hero-main { display: flex; align-items: center; gap: 1.7rem; flex-wrap: wrap; }
+.hero-logos { display: flex; align-items: center; gap: 1.1rem; padding-right: 1.7rem; border-right: 1px solid rgba(148,163,184,0.22); }
+.hero-logos img { height: 98px; width: auto; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6)); transition: transform 0.2s ease; }
+.hero-logos img:hover { transform: scale(1.06) translateY(-2px); }
 
 /* ---------- KPI ---------- */
 .kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem;
@@ -231,6 +260,7 @@ hr { border-color: var(--border) !important; }
 .alert-card { background: rgba(120,53,15,0.35); border: 1px solid #B45309; padding: 1.1rem; border-radius: 14px; margin-bottom: 1rem; color: #FEF3C7; }
 
 @media (max-width: 768px) {
+  .hero-logos { border-right: none; padding-right: 0; } .hero-logos img { height: 64px; }
   .hero { padding: 1.4rem; } .hero-title { font-size: 1.5rem; } .hero-right { align-items: flex-start; text-align: left; }
   .al { flex-wrap: wrap; } .al-meta { flex-direction: row; align-items: flex-start; }
 }
@@ -369,6 +399,39 @@ def init_db():
 
 
 init_db()
+
+
+@st.cache_data(show_spinner=False)
+def logo_uri(nombre, alto=120):
+  """Devuelve el logo como data URI (PNG redimensionado) o '' si no existe."""
+  ruta = _buscar_logo(nombre)
+  if not ruta:
+    return ''
+  try:
+    import base64
+    import io
+    from PIL import Image
+
+    from PIL import ImageDraw, ImageFilter
+
+    im = Image.open(ruta).convert('RGBA')
+    # Los logos tienen zonas internas transparentes (ej. el círculo blanco).
+    # Se rellenan de blanco para que se vean bien sobre el fondo oscuro.
+    m = im.getchannel('A').point(lambda a: 255 if a < 16 else 0)
+    if m.getpixel((0, 0)) == 255:
+      ImageDraw.floodfill(m, (0, 0), 128)  # marca el exterior
+      huecos = m.point(lambda v: 255 if v == 255 else 0).filter(
+          ImageFilter.MaxFilter(5)
+      )
+      blanco = Image.new('RGBA', im.size, (255, 255, 255, 255))
+      im = Image.composite(Image.alpha_composite(blanco, im), im, huecos)
+    ancho = max(1, round(im.width * alto / im.height))
+    im = im.resize((ancho, alto), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, format='PNG', optimize=True)
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+  except Exception:
+    return ''
 
 
 def obtener_cadetes():
@@ -549,8 +612,14 @@ def generar_pdf_legajo(cad_info, nota_info):
   return pdf_filename
 
 
+_logo_gab = logo_uri('GABINETE.png', 116)
+_brand_logo = (
+    f'<div class="brand-logo has-img"><img src="{_logo_gab}" alt="Gabinete"></div>'
+    if _logo_gab
+    else '<div class="brand-logo">🛡️</div>'
+)
 st.sidebar.markdown(
-    '<div class="brand"><div class="brand-logo">🛡️</div><div><div'
+    f'<div class="brand">{_brand_logo}<div><div'
     ' class="brand-name">I.E.S.P. G.J.F.S.M.</div><div class="brand-sub">Dirección'
     ' de Gabinete Médico</div></div></div><div class="nav-label">Navegación'
     ' principal</div>',
@@ -691,12 +760,23 @@ def construir_alertas(df_n, df_e, df_i, hoy):
 
 
 if menu == 'Dashboard General':
+  _l_dir = logo_uri('DIRECCION.png', 200)
+  _l_gab = logo_uri('GABINETE.png', 200)
+  _logos_html = ''.join(
+      f'<img src="{u}" alt="{a}">'
+      for u, a in ((_l_dir, 'Dirección General de Institutos e Instrucción'),
+                   (_l_gab, 'Gabinete Interdisciplinario'))
+      if u
+  )
+  _logos_html = f'<div class="hero-logos">{_logos_html}</div>' if _logos_html else ''
   st.markdown(
-      '<div class="hero"><div><div class="hero-eyebrow">Panel de control</div>'
+      f'<div class="hero"><div class="hero-main">{_logos_html}<div>'
+      '<div class="hero-eyebrow">Policía de Tucumán · Panel de control</div>'
       '<div class="hero-title">Centro Médico y Gabinete I.E.S.P.</div>'
       '<p class="hero-sub">Sistema integral de gestión sanitaria, control de'
-      ' guardia y legajos institucionales.</p></div><div class="hero-right">'
-      '<div class="chip"><span class="dot"></span>Sistema operativo</div>'
+      ' guardia y legajos institucionales.</p></div></div><div'
+      ' class="hero-right"><div class="chip"><span class="dot"></span>Sistema'
+      ' operativo</div>'
       f'<div class="hero-date">{fecha_larga_es(datetime.today().date())}</div>'
       '</div></div>',
       unsafe_allow_html=True,
