@@ -1180,9 +1180,15 @@ elif menu == '5. Historia Clínica Integral':
           df_cadetes['id_legajo'].astype(str) == id_leg_hc
       ].iloc[0]
       st.markdown(
-          f'<div class="profile-card"><h2>{cad_hc["apellido_nombre"]}</h2><p>Legajo:'
-          f' <b>{cad_hc["id_legajo"]}</b> | Curso: <b>{cad_hc["curso"]}</b> | DNI:'
-          f' <b>{cad_hc["dni"]}</b></p></div>',
+          '<div class="profile-card"><h2>'
+          + str(cad_hc['apellido_nombre'])
+          + '</h2><p>Legajo: <b>'
+          + str(cad_hc['id_legajo'])
+          + '</b> | Curso: <b>'
+          + str(cad_hc['curso'])
+          + '</b> | DNI: <b>'
+          + str(cad_hc['dni'])
+          + '</b></p></div>',
           unsafe_allow_html=True,
       )
       conn = sqlite3.connect(DB_NAME)
