@@ -39,7 +39,7 @@ except Exception:
   _icono = '🛡'
 
 st.set_page_config(
-    page_title="Gabinete Medico | I.E.S.P. G.J.F.S.M.",
+    page_title="Gabinete Interdisciplinario | Policía de Tucumán",
     page_icon=_icono,
     layout="wide",
     initial_sidebar_state="expanded",
@@ -74,7 +74,7 @@ html, body, [class*="css"], .stApp, button, input, textarea, select {
   color: var(--text);
 }
 [data-testid="stHeader"] { background: transparent; }
-#MainMenu, footer, [data-testid="stToolbar"] { visibility: hidden; }
+footer { visibility: hidden; }
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1400px; }
 
 h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
@@ -150,7 +150,9 @@ label, .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInpu
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 70%); mask-image: linear-gradient(90deg, transparent, #000 70%); }
 .hero > * { position: relative; z-index: 1; }
 .hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-2); }
-.hero-title { font-size: 2rem; font-weight: 800; color: #FFFFFF; margin: 0.25rem 0 0.35rem 0; letter-spacing: -0.02em; line-height: 1.15; }
+.hero-main > div:last-child { flex: 1 1 320px; min-width: 0; max-width: 640px; }
+.hero-org { font-size: 0.95rem; font-weight: 600; color: #7DD3FC; margin-top: 0.55rem; letter-spacing: 0.01em; }
+.hero-title { font-size: 1.6rem; font-weight: 800; color: #FFFFFF; margin: 0.25rem 0 0.35rem 0; letter-spacing: -0.02em; line-height: 1.15; }
 .hero-sub { font-size: 0.98rem; color: #A5B4D4; margin: 0; max-width: 640px; }
 .hero-right { text-align: right; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-end; }
 .chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; border-radius: 999px;
@@ -261,7 +263,7 @@ hr { border-color: var(--border) !important; }
 
 @media (max-width: 768px) {
   .hero-logos { border-right: none; padding-right: 0; } .hero-logos img { height: 64px; }
-  .hero { padding: 1.4rem; } .hero-title { font-size: 1.5rem; } .hero-right { align-items: flex-start; text-align: left; }
+  .hero { padding: 1.4rem; } .hero-title { font-size: 1.25rem; } .hero-right { align-items: flex-start; text-align: left; }
   .al { flex-wrap: wrap; } .al-meta { flex-direction: row; align-items: flex-start; }
 }
 
@@ -771,10 +773,11 @@ if menu == 'Dashboard General':
   _logos_html = f'<div class="hero-logos">{_logos_html}</div>' if _logos_html else ''
   st.markdown(
       f'<div class="hero"><div class="hero-main">{_logos_html}<div>'
-      '<div class="hero-eyebrow">Policía de Tucumán · Panel de control</div>'
-      '<div class="hero-title">Centro Médico y Gabinete I.E.S.P.</div>'
-      '<p class="hero-sub">Sistema integral de gestión sanitaria, control de'
-      ' guardia y legajos institucionales.</p></div></div><div'
+      '<div class="hero-eyebrow">Panel de control</div>'
+      '<div class="hero-title">Dirección de Gabinete Interdisciplinario de'
+      ' Asesoramiento Psicopedagógico y Psicológico</div>'
+      '<div class="hero-org">Dirección General de Institutos e Instrucción ·'
+      ' Policía de Tucumán</div></div></div><div'
       ' class="hero-right"><div class="chip"><span class="dot"></span>Sistema'
       ' operativo</div>'
       f'<div class="hero-date">{fecha_larga_es(datetime.today().date())}</div>'
@@ -928,7 +931,32 @@ if menu == 'Dashboard General':
           '<div class="panel-note">intervenciones en los últimos 14 días</div></div>',
           unsafe_allow_html=True,
       )
-      st.bar_chart(serie, color='#38BDF8', height=190)
+      try:
+        import altair as alt
+
+        serie.index.name = 'Fecha'
+        df_graf = serie.reset_index()
+        y_max = max(1, int(serie['Intervenciones'].max()))
+        graf = (
+            alt.Chart(df_graf)
+            .mark_bar(color='#38BDF8', cornerRadiusTopLeft=4, cornerRadiusTopRight=4, size=14)
+            .encode(
+                x=alt.X('Fecha:T', axis=alt.Axis(
+                    format='%d/%m', title=None, grid=False, labelAngle=0,
+                    tickCount=5, labelColor='#8A97B1',
+                    domainColor='#1C2740', tickColor='#1C2740')),
+                y=alt.Y('Intervenciones:Q', scale=alt.Scale(domain=[0, y_max]),
+                        axis=alt.Axis(title=None, tickMinStep=1, labelColor='#8A97B1',
+                                      gridColor='#1C2740', domain=False, ticks=False)),
+                tooltip=[alt.Tooltip('Fecha:T', format='%d/%m/%Y'),
+                         alt.Tooltip('Intervenciones:Q')],
+            )
+            .properties(height=190, background='transparent')
+            .configure_view(strokeWidth=0)
+        )
+        st.altair_chart(graf, use_container_width=True, theme=None)
+      except Exception:
+        st.bar_chart(serie, color='#38BDF8', height=190)
 
       st.markdown(
           '<div class="panel"><div class="panel-title">Exámenes periódicos'
