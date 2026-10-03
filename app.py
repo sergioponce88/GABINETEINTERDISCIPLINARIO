@@ -7,7 +7,7 @@ import streamlit as st
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
     page_title="Gabinete Médico | I.E.S.P. G.J.F.S.M.",
-    page_icon="🛡️",
+    page_icon="🛡️️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -16,7 +16,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        /* Importar fuente Inter */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
         html, body, [class*="css"] {
@@ -24,7 +23,6 @@ st.markdown(
             background-color: #F8FAFC;
         }
 
-        /* Estilo general de títulos */
         .pro-header {
             background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
             padding: 2rem;
@@ -46,7 +44,6 @@ st.markdown(
             margin-bottom: 0;
         }
 
-        /* Tarjetas de Métricas KPI */
         .metric-card {
             background: #FFFFFF;
             padding: 1.25rem;
@@ -68,7 +65,6 @@ st.markdown(
             letter-spacing: 0.05em;
         }
 
-        /* Estilo de Contenedores de Secciones */
         .card-container {
             background: #FFFFFF;
             padding: 1.5rem;
@@ -78,7 +74,6 @@ st.markdown(
             margin-bottom: 1.5rem;
         }
 
-        /* Botones personalizados */
         .stButton>button {
             background-color: #1E3A8A;
             color: white;
@@ -97,14 +92,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- CONFIGURACIÓN DE LA BASE DE DATOS SQLITE ---
+# --- CONFIGURACIÓN Y PRECARGA DE LA BASE DE DATOS SQLITE ---
 DB_NAME = "gabinete_iesp.db"
+EXCEL_FILE = "LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx"
 
 
 def init_db():
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
 
+  # 1. Tabla de Cadetes (Legajos)
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS cadetes (
             id_legajo TEXT PRIMARY KEY,
@@ -117,6 +114,7 @@ def init_db():
         )
     """)
 
+  # 2. Primera Intervención
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS primera_intervencion (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,6 +128,7 @@ def init_db():
         )
     """)
 
+  # 3. Notas Médicas y Reposos / Expedientes
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS notas_medicas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,6 +145,7 @@ def init_db():
         )
     """)
 
+  # 4. Exámenes Anuales y Periódicos
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS examenes_periodicos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +164,7 @@ def init_db():
         )
     """)
 
+  # 5. Examen de Baja / Egreso
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS examen_baja (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -177,6 +178,39 @@ def init_db():
     """)
 
   conn.commit()
+
+  # PRECARGA AUTOMÁTICA DESDE EL EXCEL SI LA TABLA ESTÁ VACÍA
+  cursor.execute("SELECT COUNT(*) FROM cadetes")
+  count = cursor.fetchone()[0]
+  if count == 0 and os.path.exists(EXCEL_FILE):
+    try:
+      df_excel = pd.read_excel(EXCEL_FILE, sheet_name="COMPAÑIA")
+      for _, row in df_excel.iterrows():
+        id_leg = str(row["CARGO"])  # Usamos el número de cargo/legajo
+        ap_nom = f"{row['APELLIDO']}, {row['NOMBRES']}"
+        curso = str(row["CURSO"])
+        dni = str(row["DNI"])
+        # Determinamos género por defecto o inferido si es necesario (por defecto Masculino/Femenino genérico o editable)
+        genero = "Masculino"  # Se puede ajustar o completar desde la app
+        f_nac = (
+            str(row["FECHA DE NACIMIENTO"]).split(" ")[0]
+            if pd.notna(row["FECHA DE NACIMIENTO"])
+            else ""
+        )
+        obs = (
+            f"Email: {row['EMAIL']} | Celular: {row['CELULAR']} | CUIL:"
+            f" {row['CUIL']}"
+        )
+
+        cursor.execute(
+            """INSERT OR IGNORE INTO cadetes (id_legajo, apellido_nombre, curso, dni, genero, fecha_nacimiento, observaciones)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (id_leg, ap_nom, curso, dni, genero, f_nac, obs),
+        )
+      conn.commit()
+    except Exception as e:
+      print(f"Error al precargar el Excel: {e}")
+
   conn.close()
 
 
@@ -194,9 +228,7 @@ def obtener_cadetes():
 st.sidebar.image(
     "https://img.icons8.com/color/96/police-badge.png", width=70
 )
-st.sidebar.markdown(
-    "### I.E.S.P. G.J.F.S.M."
-)  # Instituto de Enseñanza Superior de Policía General San Martín
+st.sidebar.markdown("### I.E.S.P. G.J.F.S.M.")
 st.sidebar.markdown(
     "<small style='color: #64748B;'>Dirección de Gabinete Interdisciplinario"
     " de Asesoramiento Psicopedagógico y Psicológico</small>",
@@ -220,7 +252,7 @@ menu = st.sidebar.radio(
 
 
 # ==========================================
-# DASHBOARD GENERAL (VISTA PRINCIPAL PRO)
+# DASHBOARD GENERAL
 # ==========================================
 if menu == "Dashboard General":
   st.markdown(
@@ -239,14 +271,13 @@ if menu == "Dashboard General":
   df_i = pd.read_sql_query("SELECT * FROM primera_intervencion", conn)
   conn.close()
 
-  # Métricas KPI en Tarjetas Pro
   col1, col2, col3, col4 = st.columns(4)
   with col1:
     st.markdown(
         f"""
             <div class="metric-card">
                 <div class="metric-value">{len(df_c)}</div>
-                <div class="metric-label">Cadetes Registrados</div>
+                <div class="metric-label">Cadetes en Base</div>
             </div>
         """,
         unsafe_allow_html=True,
@@ -266,7 +297,7 @@ if menu == "Dashboard General":
         f"""
             <div class="metric-card">
                 <div class="metric-value">{len(df_n)}</div>
-                <div class="metric-label">Notas Médicas / Expedientes</div>
+                <div class="metric-label">Expedientes Médicos</div>
             </div>
         """,
         unsafe_allow_html=True,
@@ -292,12 +323,11 @@ if menu == "Dashboard General":
     st.markdown(
         """
             <div class="card-container">
-                <h3 style="color: #1E3A8A; margin-top: 0;">⚡ Accesos Rápidos del Gabinete</h3>
-                <p style="color: #475569;">Utilice el menú lateral para registrar nuevas atenciones en primera intervención, cargar notas médicas emitidas por la oficina de Detall, o convalidar el alta médica correspondiente.</p>
+                <h3 style="color: #1E3A8A; margin-top: 0;">⚡ Base de Datos Precargada</h3>
+                <p style="color: #475569;">El listado oficial de compañía de cadetes (1°, 2° y 3° año) ha sido cargado automáticamente desde el archivo institucional. Puede consultar, editar o buscar cualquier cadete instantáneamente.</p>
                 <ul>
                     <li><b>Control Trimestral Femeninas:</b> Examen Beta HCG obligatorio.</li>
                     <li><b>Tipos de Reposo:</b> Domiciliario, Académico, Internación o ART.</li>
-                    <li><b>Trazabilidad Total:</b> Historial completo durante los 3 años de cursada.</li>
                 </ul>
             </div>
         """,
@@ -310,7 +340,7 @@ if menu == "Dashboard General":
                 <h3 style="color: #1E3A8A; margin-top: 0;">🛡️ Instituto de Enseñanza Superior de Policía</h3>
                 <p style="color: #475569;"><b>"Gral. José Francisco de San Martín"</b></p>
                 <hr style="border: 0; border-top: 1px solid #E2E8F0;">
-                <p style="font-size: 0.9rem; color: #64748B;">Módulo de gestión optimizado para médicos, psicólogos, psicopedagogos y personal administrativo del gabinete interdisciplinario.</p>
+                <p style="font-size: 0.9rem; color: #64748B;">Dirección de Gabinete Interdisciplinario de Asesoramiento Psicopedagógico y Psicológico.</p>
             </div>
         """,
         unsafe_allow_html=True,
@@ -326,25 +356,37 @@ elif menu == "Gestión de Legajos":
       unsafe_allow_html=True,
   )
   st.markdown(
-      "<p style='color: #64748B;'>Registro oficial de legajos identificados"
-      " unívocamente por número, apellido y nombre.</p>",
+      "<p style='color: #64748B;'>Listado oficial precargado y gestión de"
+      " legajos institucionales.</p>",
       unsafe_allow_html=True,
   )
 
-  tab1, tab2 = st.tabs(["➕ Registrar Nuevo Cadete", "🔍 Consultar / Listar"])
+  tab1, tab2 = st.tabs(["🔍 Consultar / Listar Compañía", "➕ Registrar Nuevo"])
 
   with tab1:
+    df_cadetes = obtener_cadetes()
+    if not df_cadetes.empty:
+      busqueda = st.text_input(
+          "🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo/Cargo"
+      )
+      if busqueda:
+        df_cadetes = df_cadetes[
+            df_cadetes["apellido_nombre"]
+            .str.contains(busqueda, case=False, na=False)
+            | df_cadetes["id_legajo"]
+            .str.contains(busqueda, case=False, na=False)
+        ]
+      st.dataframe(df_cadetes, use_container_width=True)
+    else:
+      st.info("No hay cadetes registrados.")
+
+  with tab2:
     with st.form("form_nuevo_cadete"):
-      st.markdown("#### Datos Personales e Institucionales")
       col1, col2 = st.columns(2)
       with col1:
-        id_legajo = st.text_input(
-            "Número de Legajo (Ej: LEG-2026-001)*"
-        ).strip()
-        apellido_nombre = st.text_input("Apellido y Nombre*").strip()
-        curso = st.selectbox(
-            "Curso", ["1er Año", "2do Año", "3er Año", "Oficial Ayudante"]
-        )
+        id_legajo = st.text_input("Número de Legajo / Cargo*").strip()
+        apellido_nombre = st.text_input("Apellido y Nombres*").strip()
+        curso = st.selectbox("Curso", ["1 AÑO", "2 AÑO", "3 AÑO"])
       with col2:
         dni = st.text_input("DNI")
         genero = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
@@ -352,10 +394,8 @@ elif menu == "Gestión de Legajos":
             "Fecha de Nacimiento", value=date(2000, 1, 1)
         )
 
-      observaciones = st.text_area(
-          "Observaciones Generales / Antecedentes Médicos Previos"
-      )
-      submit_cadete = st.form_submit_button("Guardar Legajo en Sistema")
+      observaciones = st.text_area("Observaciones / Contacto / Antecedentes")
+      submit_cadete = st.form_submit_button("Guardar Legajo")
 
       if submit_cadete:
         if id_legajo and apellido_nombre:
@@ -376,36 +416,13 @@ elif menu == "Gestión de Legajos":
             )
             conn.commit()
             conn.close()
-            st.success(
-                f"✅ ¡Legajo {id_legajo} de {apellido_nombre} guardado con"
-                " éxito!"
-            )
+            st.success(f"✅ ¡Legajo {id_legajo} guardado con éxito!")
           except sqlite3.IntegrityError:
             st.error(
                 "❌ Error: El número de legajo ya se encuentra registrado."
             )
         else:
-          st.warning(
-              "⚠️ Complete obligatoriamente el Número de Legajo y el Apellido y"
-              " Nombre."
-          )
-
-  with tab2:
-    df_cadetes = obtener_cadetes()
-    if not df_cadetes.empty:
-      busqueda = st.text_input(
-          "🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo"
-      )
-      if busqueda:
-        df_cadetes = df_cadetes[
-            df_cadetes["apellido_nombre"]
-            .str.contains(busqueda, case=False, na=False)
-            | df_cadetes["id_legajo"]
-            .str.contains(busqueda, case=False, na=False)
-        ]
-      st.dataframe(df_cadetes, use_container_width=True)
-    else:
-      st.info("No hay cadetes registrados actualmente.")
+          st.warning("⚠️ Complete Legajo y Apellido y Nombres.")
 
 
 # ==========================================
@@ -424,7 +441,7 @@ elif menu == "1. Primera Intervención":
 
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️ Debe registrar al menos un cadete en el módulo de Legajos.")
+    st.warning("⚠️ No hay cadetes en la base de datos.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
@@ -439,15 +456,12 @@ elif menu == "1. Primera Intervención":
             "Fecha y Hora de Atención", datetime.now()
         )
         sintomas = st.text_area(
-            "Síntomas / Motivo (Ej: Dolor de cabeza, lesiones, congestión,"
-            " etc.)"
+            "Síntomas / Motivo (Dolor de cabeza, lesiones, congestión, etc.)"
         )
       with col2:
         presion = st.text_input("Valores de Presión Arterial (Ej: 120/80)")
         saturacion = st.text_input("Saturación de Oxígeno (Ej: 98%)")
-        derivacion = st.text_input(
-            "Derivación (Ej: Clínica Central / Especialista)"
-        )
+        derivacion = st.text_input("Derivación (Clínica / Especialista)")
 
       submit_int = st.form_submit_button("Registrar Primera Intervención")
 
@@ -496,7 +510,7 @@ elif menu == "2. Notas Médicas y Reposos":
 
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️ Debe registrar al menos un cadete.")
+    st.warning("⚠️ No hay cadetes en la base de datos.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
@@ -549,9 +563,7 @@ elif menu == "2. Notas Médicas y Reposos":
         )
         conn.commit()
         conn.close()
-        st.success(
-            f"✅ ¡Expediente {nro_expediente} guardado y vinculado al legajo!"
-        )
+        st.success(f"✅ ¡Expediente {nro_expediente} guardado con éxito!")
 
     st.markdown("### 📂 Expedientes y Notas Registradas")
     conn = sqlite3.connect(DB_NAME)
@@ -593,7 +605,7 @@ elif menu == "3. Control de Alta":
 
     row_sel = df_pendientes[df_pendientes["id"] == exp_id].iloc[0]
     st.markdown(
-        f"**Cadete (Legajo):** {row_sel['id_legajo']} | **Diagnóstico:**"
+        f"**Legajo:** {row_sel['id_legajo']} | **Diagnóstico:**"
         f" {row_sel['diagnostico']}"
     )
 
@@ -617,9 +629,7 @@ elif menu == "3. Control de Alta":
         st.rerun()
     else:
       nueva_fecha_hasta = st.date_input("Nueva Fecha de Fin de Reposo")
-      nueva_indicacion = st.text_input(
-          "Motivo de Prórroga / Nuevos Medicamentos"
-      )
+      nueva_indicacion = st.text_input("Motivo / Nuevos Medicamentos")
       if st.button("Registrar Prórroga"):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
@@ -651,7 +661,7 @@ elif menu == "4. Exámenes Periódicos y Anuales":
 
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️ Debe registrar al menos un cadete.")
+    st.warning("⚠️ No hay cadetes.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
@@ -663,7 +673,7 @@ elif menu == "4. Exámenes Periódicos y Anuales":
     es_femenino = cadete_info["genero"] == "Femenino"
 
     with st.form("form_examenes"):
-      anio_eval = st.text_input("Año de Evaluación (Ej: 2026)", "2026")
+      anio_eval = st.text_input("Año de Evaluación", "2026")
 
       col1, col2 = st.columns(2)
       with col1:
@@ -718,7 +728,7 @@ elif menu == "4. Exámenes Periódicos y Anuales":
         )
         conn.commit()
         conn.close()
-        st.success("✅ ¡Exámenes periódicos guardados con éxito!")
+        st.success("✅ ¡Exámenes guardados con éxito!")
 
     st.markdown("### 📊 Historial de Exámenes del Cadete")
     conn = sqlite3.connect(DB_NAME)
@@ -747,7 +757,7 @@ elif menu == "5. Historia Clínica Integral":
 
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️ Debe registrar al menos un cadete.")
+    st.warning("⚠️ No hay cadetes.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
@@ -757,9 +767,8 @@ elif menu == "5. Historia Clínica Integral":
 
     cadete = df_cadetes[df_cadetes["id_legajo"] == id_legajo].iloc[0]
     st.info(
-        f"📌 **Cadete:** {cadete['apellido_nombre']} | **Legajo:**"
-        f" {cadete['id_legajo']} | **Curso:** {cadete['curso']} | **DNI:**"
-        f" {cadete['dni']}"
+        f"📌 **Cadete:** {cadete['apellido_nombre']} | **Legajo/Cargo:**"
+        f" {cadete['id_legajo']} | **Curso:** {cadete['curso']}"
     )
 
     conn = sqlite3.connect(DB_NAME)
@@ -802,7 +811,7 @@ elif menu == "6. Examen de Baja / Egreso":
 
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️ Debe registrar al menos un cadete.")
+    st.warning("⚠️ No hay cadetes.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
