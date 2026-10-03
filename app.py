@@ -519,7 +519,7 @@ elif menu == "4. Exámenes Periódicos y Anuales":
   )
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️️ No hay cadetes.")
+    st.warning("⚠️ No hay cadetes.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
@@ -613,16 +613,16 @@ elif menu == "5. Historia Clínica Integral":
     conn.close()
 
     st.markdown("### 📋 Notas Médicas y Reposos")
-    (
-        st.dataframe(df_nm, use_container_width=True)
-        if not df_nm.empty
-        else st.write("Sin notas médicas.")
-    )
+    if not df_nm.empty:
+      st.dataframe(df_nm, use_container_width=True)
+    else:
+      st.write("Sin notas médicas.")
+
     st.markdown("### 🩺 Primera Intervención")
-    (
-        st.dataframe(df_int, use_container_width=True)
-        if not df_int.empty
-        else st.write("Sin intervenciones.")
+    if not df_int.empty:
+      st.dataframe(df_int, use_container_width=True)
+    else:
+      st.write("Sin intervenciones.")
 
 elif menu == "6. Examen de Baja / Egreso":
   st.markdown(
