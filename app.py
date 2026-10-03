@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 st.markdown("""<style>
-    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
         background-color: #030712;
@@ -392,7 +392,7 @@ def generar_pdf_legajo(cad_info, nota_info):
   return pdf_filename
 
 
-st.sidebar.image('[https://img.icons8.com/color/96/police-badge.png](https://img.icons8.com/color/96/police-badge.png)', width=75)
+st.sidebar.image('https://img.icons8.com/color/96/police-badge.png', width=75)
 st.sidebar.markdown('### I.E.S.P. G.J.F.S.M.')
 menu = st.sidebar.radio(
     'Navegación Principal',
@@ -534,7 +534,7 @@ if menu == 'Dashboard General':
         ]
       st.dataframe(df_c_view, use_container_width=True)
   with dash_tab3:
-    st.markdown('### ⚙️️ Administración e Institución')
+    st.markdown('### ⚙️ Administración e Institución')
     if st.button('Sincronizar Base de Cadetes Ahora'):
       exito, msg = importar_excel_directo()
       if exito:
@@ -1197,15 +1197,34 @@ elif menu == '5. Historia Clínica Integral':
       if not df_nm_hc.empty:
         for _, r in df_nm_hc.iterrows():
           st.markdown(
-              f'<div class="profile-card" style="border-left: 4px solid'
-              f' #38BDF8;"><h4>Expediente: {r["nro_expediente"]} | Diagnóstico:'
-              f' {r["diagnostico"]}</h4><p><b>Médico:</b> {r["medico"]} |'
-              f' <b>Reposo:</b> {r["tipo_reposo"]} ({r["fecha_desde"]} al'
-              f' {r["fecha_hasta"]}) | <b>Estado:</b> {r["estado_alta"]}</p><p><b>Certificados'
-              f' e Indicaciones:</b><br>{r["certificados_indicaciones"] if pd.notna(r["certificados_indicaciones"]) else "Sin'
-              f' anexos"}</p><p><b>Análisis y Estudios:</b><br>{r["analisis_estudios"]'
-              ' if pd.notna(r["analisis_estudios"]) else "Sin'
-              ' estudios"}</p></div>',
+              '<div class="profile-card" style="border-left: 4px solid'
+              ' #38BDF8;"><h4>Expediente: '
+              + str(r['nro_expediente'])
+              + ' | Diagnóstico: '
+              + str(r['diagnostico'])
+              + '</h4><p><b>Médico:</b> '
+              + str(r['medico'])
+              + ' | <b>Reposo:</b> '
+              + str(r['tipo_reposo'])
+              + ' ('
+              + str(r['fecha_desde'])
+              + ' al '
+              + str(r['fecha_hasta'])
+              + ') | <b>Estado:</b> '
+              + str(r['estado_alta'])
+              + '</p><p><b>Certificados e Indicaciones:</b><br>'
+              + (
+                  str(r['certificados_indicaciones'])
+                  if pd.notna(r['certificados_indicaciones'])
+                  else 'Sin anexos'
+              )
+              + '</p><p><b>Análisis y Estudios:</b><br>'
+              + (
+                  str(r['analisis_estudios'])
+                  if pd.notna(r['analisis_estudios'])
+                  else 'Sin estudios'
+              )
+              + '</p></div>',
               unsafe_allow_html=True,
           )
       else:
@@ -1214,17 +1233,20 @@ elif menu == '5. Historia Clínica Integral':
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
           st.markdown(
-              f"- **{doc_row['titulo_documento']}** (Subido el"
-              f" {doc_row['fecha_subida']})"
+              '- **'
+              + str(doc_row['titulo_documento'])
+              + '** (Subido el '
+              + str(doc_row['fecha_subida'])
+              + ')'
           )
           if os.path.exists(str(doc_row['archivo_nombre'])):
-            with open(doc_row['archivo_nombre'], 'rb') as f:
+            with open(str(doc_row['archivo_nombre']), 'rb') as f:
               st.download_button(
-                  label=f"📥 Descargar PDF: {doc_row['archivo_nombre']}",
+                  label='📥 Descargar PDF: ' + str(doc_row['archivo_nombre']),
                   data=f.read(),
-                  file_name=doc_row['archivo_nombre'],
+                  file_name=str(doc_row['archivo_nombre']),
                   mime='application/pdf',
-                  key=f"dl_{doc_row['id']}",
+                  key='dl_' + str(doc_row['id']),
               )
       else:
         st.info('No hay documentos PDF en el legajo digital todavía.')
