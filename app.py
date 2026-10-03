@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 st.markdown("""<style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
         background-color: #030712;
@@ -200,6 +200,16 @@ def init_db():
       ' AUTOINCREMENT, id_legajo TEXT, fecha_baja TEXT, motivo TEXT,'
       ' estado_salud_egreso TEXT, observaciones_medicas TEXT)'
   )
+  for col, col_type in [
+      ('certificados_indicaciones', 'TEXT'),
+      ('analisis_estudios', 'TEXT'),
+      ('medicamentos', 'TEXT'),
+      ('estado_alta', 'TEXT DEFAULT "Pendiente"'),
+  ]:
+    try:
+      cursor.execute(f'ALTER TABLE notas_medicas ADD COLUMN {col} {col_type};')
+    except sqlite3.OperationalError:
+      pass
   conn.commit()
   conn.close()
   conn = sqlite3.connect(DB_NAME)
@@ -392,7 +402,7 @@ def generar_pdf_legajo(cad_info, nota_info):
   return pdf_filename
 
 
-st.sidebar.image('https://img.icons8.com/color/96/police-badge.png', width=75)
+st.sidebar.image('[https://img.icons8.com/color/96/police-badge.png](https://img.icons8.com/color/96/police-badge.png)', width=75)
 st.sidebar.markdown('### I.E.S.P. G.J.F.S.M.')
 menu = st.sidebar.radio(
     'Navegación Principal',
