@@ -241,7 +241,7 @@ elif menu == "Gestión de Legajos":
         if not df_cadetes.empty:
             busqueda = st.text_input("Busqueda rapida por Apellido, Nombre o Numero de Legajo/Cargo")
             if busqueda:
-                df_cadetes = df_cadetes[df_cadetes['apellido_nombre'].str.contains(busqueda, case=False, na=False) | df_cadetes['id_legajo'].str.contains(busqueda, case=False, na=False)]
+                df_cadetes = df_cadetes[df_cadetes['apellido_nombre'].str.contains(busqueda, case=False, na=False) | df_cadetes['id_legajo'].astype(str).str.contains(busqueda, case=False, na=False)]
             st.dataframe(df_cadetes, use_container_width=True)
         else:
             st.warning("No hay cadetes en la base.")
@@ -310,7 +310,7 @@ elif menu == "Personal del Gabinete":
         st.markdown("### Eliminar Personal del Gabinete")
         df_pers_del = obtener_personal()
         if not df_pers_del.empty:
-            lista_del = (df_pers_del['id_legajo_personal'] + " - " + df_pers_del['apellido_nombre'] + " (" + df_pers_del['especialidad'] + ")").tolist()
+            lista_del = (df_pers_del['id_legajo_personal'].astype(str) + " - " + df_pers_del['apellido_nombre'] + " (" + df_pers_del['especialidad'] + ")").tolist()
             sel_del = st.selectbox("Seleccione el Personal a Quitar", lista_del)
             if st.button("Eliminar Personal Seleccionado"):
                 id_elim = sel_del.split(" - ")[0]
@@ -329,12 +329,12 @@ elif menu == "1. Primera Intervención":
     if df_cadetes.empty:
         st.warning("No hay cadetes en la base.")
     else:
-        lista_cadetes = (df_cadetes['id_legajo'] + " - " + df_cadetes['apellido_nombre']).tolist()
+        lista_cadetes = (df_cadetes['id_legajo'].astype(str) + " - " + df_cadetes['apellido_nombre']).tolist()
         seleccion = st.selectbox("Seleccionar Cadete", lista_cadetes)
         id_legajo = seleccion.split(" - ")[0]
-        cad_sel = df_cadetes[df_cadetes['id_legajo'] == id_legajo].iloc[0]
+        cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[0]
         
-        st.markdown(f"""<div class="profile-card"><div style="display: flex; justify-content: space-between; align-items: center;"><div><h3 style="margin: 0; color: #FFFFFF;">{cad_sel['apellido_nombre']}</h3><p style="margin: 0.25rem 0 0 0; color: #94A3B8; font-size: 0.9rem;">Legajo: <b>{cad_sel['id_legajo']}</b> | Curso: <b>{cad_sel['curso']}</b> | DNI: <b>{cad_sel['dni']}</b></p></div><div><span class="badge-active">ACTIVO</span></div></div></div>""", unsafe_allow_html=True)
+        st.markdown(f'<div class="profile-card"><div style="display: flex; justify-content: space-between; align-items: center;"><div><h3 style="margin: 0; color: #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin: 0.25rem 0 0 0; color: #94A3B8; font-size: 0.9rem;">Legajo: <b>{cad_sel["id_legajo"]}</b> | Curso: <b>{cad_sel["curso"]}</b> | DNI: <b>{cad_sel["dni"]}</b></p></div><div><span class="badge-active">ACTIVO</span></div></div></div>', unsafe_allow_html=True)
         
         lista_profesionales = df_personal['apellido_nombre'].tolist() if not df_personal.empty else ["Sin personal registrado (Cargue en 'Personal del Gabinete')"]
         
@@ -382,7 +382,7 @@ elif menu == "2. Notas Médicas y Reposos":
     if df_cadetes.empty:
         st.warning("No hay cadetes.")
     else:
-        lista_cadetes = (df_cadetes['id_legajo'] + " - " + df_cadetes['apellido_nombre']).tolist()
+        lista_cadetes = (df_cadetes['id_legajo'].astype(str) + " - " + df_cadetes['apellido_nombre']).tolist()
         seleccion = st.selectbox("Seleccionar Cadete", lista_cadetes)
         id_legajo = seleccion.split(" - ")[0]
         with st.form("form_nota_medica"):
@@ -430,10 +430,10 @@ elif menu == "4. Exámenes Periódicos y Anuales":
     if df_cadetes.empty:
         st.warning("No hay cadetes.")
     else:
-        lista_cadetes = (df_cadetes['id_legajo'] + " - " + df_cadetes['apellido_nombre']).tolist()
+        lista_cadetes = (df_cadetes['id_legajo'].astype(str) + " - " + df_cadetes['apellido_nombre']).tolist()
         seleccion = st.selectbox("Seleccionar Cadete", lista_cadetes)
         id_legajo = seleccion.split(" - ")[0]
-        cadete_info = df_cadetes[df_cadetes['id_legajo'] == id_legajo].iloc[0]
+        cadete_info = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[0]
         es_femenino = cadete_info['genero'] == 'Femenino'
         with st.form("form_examenes"):
             anio_eval = st.text_input("Anio de Evaluacion", "2026")
@@ -463,11 +463,11 @@ elif menu == "5. Historia Clínica Integral":
     if df_cadetes.empty:
         st.warning("No hay cadetes.")
     else:
-        lista_cadetes = (df_cadetes['id_legajo'] + " - " + df_cadetes['apellido_nombre']).tolist()
+        lista_cadetes = (df_cadetes['id_legajo'].astype(str) + " - " + df_cadetes['apellido_nombre']).tolist()
         seleccion = st.selectbox("Seleccionar Cadete", lista_cadetes)
         id_legajo = seleccion.split(" - ")[0]
-        cadete = df_cadetes[df_cadetes['id_legajo'] == id_legajo].iloc[0]
-        st.markdown(f"""<div class="profile-card"><div style="display: flex; justify-content: space-between; align-items: center;"><div><h2 style="margin: 0; color: #FFFFFF;">{cadete['apellido_nombre']}</h2><p style="margin: 0.25rem 0 0 0; color: #94A3B8; font-size: 0.95rem;">Legajo: <b>{cadete['id_legajo']}</b> | Curso: <b>{cadete['curso']}</b> | DNI: <b>{cadete['dni']}</b></p></div><div><span class="badge-active">LEGAJO SANITARIO</span></div></div></div>""", unsafe_allow_html=True)
+        cadete = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[0]
+        st.markdown(f'<div class="profile-card"><div style="display: flex; justify-content: space-between; align-items: center;"><div><h2 style="margin: 0; color: #FFFFFF;">{cadete["apellido_nombre"]}</h2><p style="margin: 0.25rem 0 0 0; color: #94A3B8; font-size: 0.95rem;">Legajo: <b>{cadete["id_legajo"]}</b> | Curso: <b>{cadete["curso"]}</b> | DNI: <b>{cadete["dni"]}</b></p></div><div><span class="badge-active">LEGAJO SANITARIO</span></div></div></div>', unsafe_allow_html=True)
         conn = sqlite3.connect(DB_NAME)
         df_nm = pd.read_sql_query(f"SELECT * FROM notas_medicas WHERE id_legajo = '{id_legajo}'", conn)
         df_int = pd.read_sql_query(f"SELECT * FROM primera_intervencion WHERE id_legajo = '{id_legajo}'", conn)
@@ -489,7 +489,7 @@ elif menu == "6. Examen de Baja / Egreso":
     if df_cadetes.empty:
         st.warning("No hay cadetes.")
     else:
-        lista_cadetes = (df_cadetes['id_legajo'] + " - " + df_cadetes['apellido_nombre'].strip()).tolist()
+        lista_cadetes = (df_cadetes['id_legajo'].astype(str) + " - " + df_cadetes['apellido_nombre'].str.strip()).tolist()
         seleccion = st.selectbox("Seleccionar Cadete", lista_cadetes)
         id_legajo = seleccion.split(" - ")[0]
         with st.form("form_baja"):
