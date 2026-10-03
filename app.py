@@ -7,7 +7,7 @@ import streamlit as st
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
     page_title="Gabinete Médico | I.E.S.P. G.J.F.S.M.",
-    page_icon="🛡️️",
+    page_icon="🛡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -179,19 +179,16 @@ def init_db():
 
   conn.commit()
 
-  # PRECARGA AUTOMÁTICA DESDE EL EXCEL SI LA TABLA ESTÁ VACÍA
-  cursor.execute("SELECT COUNT(*) FROM cadetes")
-  count = cursor.fetchone()[0]
-  if count == 0 and os.path.exists(EXCEL_FILE):
+  # PRECARGA AUTOMÁTICA DESDE EL EXCEL SI LA TABLA ESTÁ VACÍA O NECESITA ACTUALIZARSE
+  if os.path.exists(EXCEL_FILE):
     try:
       df_excel = pd.read_excel(EXCEL_FILE, sheet_name="COMPAÑIA")
       for _, row in df_excel.iterrows():
-        id_leg = str(row["CARGO"])  # Usamos el número de cargo/legajo
-        ap_nom = f"{row['APELLIDO']}, {row['NOMBRES']}"
-        curso = str(row["CURSO"])
-        dni = str(row["DNI"])
-        # Determinamos género por defecto o inferido si es necesario (por defecto Masculino/Femenino genérico o editable)
-        genero = "Masculino"  # Se puede ajustar o completar desde la app
+        id_leg = str(row["CARGO"]).strip()  # Usamos el número de cargo/legajo
+        ap_nom = f"{str(row['APELLIDO']).strip()}, {str(row['NOMBRES']).strip()}"
+        curso = str(row["CURSO"]).strip()
+        dni = str(row["DNI"]).strip()
+        genero = "Masculino"  # Por defecto (configurable)
         f_nac = (
             str(row["FECHA DE NACIMIENTO"]).split(" ")[0]
             if pd.notna(row["FECHA DE NACIMIENTO"])
@@ -324,11 +321,7 @@ if menu == "Dashboard General":
         """
             <div class="card-container">
                 <h3 style="color: #1E3A8A; margin-top: 0;">⚡ Base de Datos Precargada</h3>
-                <p style="color: #475569;">El listado oficial de compañía de cadetes (1°, 2° y 3° año) ha sido cargado automáticamente desde el archivo institucional. Puede consultar, editar o buscar cualquier cadete instantáneamente.</p>
-                <ul>
-                    <li><b>Control Trimestral Femeninas:</b> Examen Beta HCG obligatorio.</li>
-                    <li><b>Tipos de Reposo:</b> Domiciliario, Académico, Internación o ART.</li>
-                </ul>
+                <p style="color: #475569;">El listado oficial de compañía de cadetes (1°, 2° y 3° año) se encuentra sincronizado con el archivo institucional. Puede consultar, editar o buscar cualquier cadete instantáneamente.</p>
             </div>
         """,
         unsafe_allow_html=True,
@@ -378,7 +371,10 @@ elif menu == "Gestión de Legajos":
         ]
       st.dataframe(df_cadetes, use_container_width=True)
     else:
-      st.info("No hay cadetes registrados.")
+      st.warning(
+          "⚠️ No se encontraron cadetes. Verifique que el archivo Excel de la"
+          " compañía esté cargado en el repositorio."
+      )
 
   with tab2:
     with st.form("form_nuevo_cadete"):
@@ -417,6 +413,7 @@ elif menu == "Gestión de Legajos":
             conn.commit()
             conn.close()
             st.success(f"✅ ¡Legajo {id_legajo} guardado con éxito!")
+            st.rerun()
           except sqlite3.IntegrityError:
             st.error(
                 "❌ Error: El número de legajo ya se encuentra registrado."
@@ -452,8 +449,8 @@ elif menu == "1. Primera Intervención":
     with st.form("form_intervencion"):
       col1, col2 = st.columns(2)
       with col1:
-        fecha_hora = st.datetime_input(
-            "Fecha y Hora de Atención", datetime.now()
+        fecha_hora = st.text_input(
+            "Fecha y Hora", value=str(datetime.now().strftime("%Y-%m-%d %H:%M"))
         )
         sintomas = st.text_area(
             "Síntomas / Motivo (Dolor de cabeza, lesiones, congestión, etc.)"
@@ -473,7 +470,7 @@ elif menu == "1. Primera Intervención":
                        VALUES (?, ?, ?, ?, ?, ?)""",
             (
                 id_legajo,
-                str(fecha_hora),
+                fecha_hora,
                 sintomas,
                 presion,
                 saturacion,
@@ -510,7 +507,7 @@ elif menu == "2. Notas Médicas y Reposos":
 
   df_cadetes = obtener_cadetes()
   if df_cadetes.empty:
-    st.warning("⚠️ No hay cadetes en la base de datos.")
+    st.warning("⚠️️ No hay cadetes en la base de datos.")
   else:
     lista_cadetes = (
         df_cadetes["id_legajo"] + " - " + df_cadetes["apellido_nombre"]
