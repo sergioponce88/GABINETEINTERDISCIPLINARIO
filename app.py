@@ -93,6 +93,15 @@ st.markdown("""<style>
         margin-bottom: 1rem;
         color: #FEF3C7;
     }
+    .badge-active {
+        background-color: rgba(6, 95, 70, 0.6);
+        color: #34D399;
+        border: 1px solid #059669;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
     .stTextInput input, .stSelectbox select, .stTextArea textarea, .stDateInput input {
         background-color: #111827 !important;
         color: #FFFFFF !important;
@@ -1180,15 +1189,9 @@ elif menu == '5. Historia Clínica Integral':
           df_cadetes['id_legajo'].astype(str) == id_leg_hc
       ].iloc[0]
       st.markdown(
-          '<div class="profile-card"><h2>'
-          + str(cad_hc['apellido_nombre'])
-          + '</h2><p>Legajo: <b>'
-          + str(cad_hc['id_legajo'])
-          + '</b> | Curso: <b>'
-          + str(cad_hc['curso'])
-          + '</b> | DNI: <b>'
-          + str(cad_hc['dni'])
-          + '</b></p></div>',
+          f'<div class="profile-card"><h2>{cad_hc["apellido_nombre"]}</h2><p>Legajo:'
+          f' <b>{cad_hc["id_legajo"]}</b> | Curso: <b>{cad_hc["curso"]}</b> | DNI:'
+          f' <b>{cad_hc["dni"]}</b></p></div>',
           unsafe_allow_html=True,
       )
       conn = sqlite3.connect(DB_NAME)
@@ -1203,34 +1206,15 @@ elif menu == '5. Historia Clínica Integral':
       if not df_nm_hc.empty:
         for _, r in df_nm_hc.iterrows():
           st.markdown(
-              '<div class="profile-card" style="border-left: 4px solid'
-              ' #38BDF8;"><h4>Expediente: '
-              + str(r['nro_expediente'])
-              + ' | Diagnóstico: '
-              + str(r['diagnostico'])
-              + '</h4><p><b>Médico:</b> '
-              + str(r['medico'])
-              + ' | <b>Reposo:</b> '
-              + str(r['tipo_reposo'])
-              + ' ('
-              + str(r['fecha_desde'])
-              + ' al '
-              + str(r['fecha_hasta'])
-              + ') | <b>Estado:</b> '
-              + str(r['estado_alta'])
-              + '</p><p><b>Certificados e Indicaciones:</b><br>'
-              + (
-                  str(r['certificados_indicaciones'])
-                  if pd.notna(r['certificados_indicaciones'])
-                  else 'Sin anexos'
-              )
-              + '</p><p><b>Análisis y Estudios:</b><br>'
-              + (
-                  str(r['analisis_estudios'])
-                  if pd.notna(r['analisis_estudios'])
-                  else 'Sin estudios'
-              )
-              + '</p></div>',
+              f'<div class="profile-card" style="border-left: 4px solid'
+              f' #38BDF8;"><h4>Expediente: {r["nro_expediente"]} | Diagnóstico:'
+              f' {r["diagnostico"]}</h4><p><b>Médico:</b> {r["medico"]} |'
+              f' <b>Reposo:</b> {r["tipo_reposo"]} ({r["fecha_desde"]} al'
+              f' {r["fecha_hasta"]}) | <b>Estado:</b> {r["estado_alta"]}</p><p><b>Certificados'
+              f' e Indicaciones:</b><br>{r["certificados_indicaciones"] if pd.notna(r["certificados_indicaciones"]) else "Sin'
+              f' anexos"}</p><p><b>Análisis y Estudios:</b><br>{r["analisis_estudios"]'
+              ' if pd.notna(r["analisis_estudios"]) else "Sin'
+              ' estudios"}</p></div>',
               unsafe_allow_html=True,
           )
       else:
@@ -1239,20 +1223,17 @@ elif menu == '5. Historia Clínica Integral':
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
           st.markdown(
-              '- **'
-              + str(doc_row['titulo_documento'])
-              + '** (Subido el '
-              + str(doc_row['fecha_subida'])
-              + ')'
+              f"- **{doc_row['titulo_documento']}** (Subido el"
+              f" {doc_row['fecha_subida']})"
           )
           if os.path.exists(str(doc_row['archivo_nombre'])):
-            with open(str(doc_row['archivo_nombre']), 'rb') as f:
+            with open(doc_row['archivo_nombre'], 'rb') as f:
               st.download_button(
-                  label='📥 Descargar PDF: ' + str(doc_row['archivo_nombre']),
+                  label=f"📥 Descargar PDF: {doc_row['archivo_nombre']}",
                   data=f.read(),
-                  file_name=str(doc_row['archivo_nombre']),
+                  file_name=doc_row['archivo_nombre'],
                   mime='application/pdf',
-                  key='dl_' + str(doc_row['id']),
+                  key=f"dl_{doc_row['id']}",
               )
       else:
         st.info('No hay documentos PDF en el legajo digital todavía.')
