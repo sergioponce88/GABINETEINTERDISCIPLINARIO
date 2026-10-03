@@ -6,7 +6,14 @@ import streamlit as st
 import reportlab
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    KeepTogether,
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 st.set_page_config(
@@ -16,7 +23,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""<style>
+st.markdown(
+    """<style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
@@ -82,15 +90,6 @@ st.markdown("""<style>
         margin-bottom: 1rem;
         color: #FEF3C7;
     }
-    .badge-active {
-        background-color: rgba(6, 95, 70, 0.6);
-        color: #34D399;
-        border: 1px solid #059669;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 700;
-    }
     .stTextInput input, .stSelectbox select, .stTextArea textarea, .stDateInput input {
         background-color: #111827 !important;
         color: #FFFFFF !important;
@@ -106,16 +105,17 @@ st.markdown("""<style>
         border: none;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
     }
-</style>
-""", unsafe_allow_html=True)
+</style>""",
+    unsafe_allow_html=True,
+)
 
-DB_NAME = "gabinete_iesp.db"
-EXCEL_FILE = "LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx"
+DB_NAME = 'gabinete_iesp.db'
+EXCEL_FILE = 'LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx'
 
 
 def importar_excel_directo():
   if not os.path.exists(EXCEL_FILE):
-    return False, f"No se encontro el archivo Excel: {EXCEL_FILE}"
+    return False, f'No se encontro el archivo Excel: {EXCEL_FILE}'
   try:
     df_excel = pd.read_excel(EXCEL_FILE, sheet_name=0)
     conn = sqlite3.connect(DB_NAME)
@@ -150,9 +150,9 @@ def importar_excel_directo():
       cargados += 1
     conn.commit()
     conn.close()
-    return True, f'Sincronizados {cargados} cadetes.'
+    return True, f'Se sincronizaron {cargados} cadetes correctamente.'
   except Exception as e:
-    return False, str(e)
+    return False, f'Error al procesar el Excel: {str(e)}'
 
 
 def init_db():
@@ -326,6 +326,16 @@ def generar_pdf_legajo(cad_info, nota_info):
   elements.append(
       Paragraph('ANEXO DE EXPEDIENTE Y NOTA MÉDICA', section_heading)
   )
+  cert = (
+      nota_info['certificados_indicaciones']
+      if nota_info['certificados_indicaciones']
+      else 'Sin transcripcion'
+  )
+  anal = (
+      nota_info['analisis_estudios']
+      if nota_info['analisis_estudios']
+      else 'Sin estudios'
+  )
   note_data = [
       [
           Paragraph(
@@ -355,15 +365,9 @@ def generar_pdf_legajo(cad_info, nota_info):
       ],
       [
           Paragraph(
-              '<b>Certificados e'
-              f" Indicaciones:</b><br/>{nota_info['certificados_indicaciones']}",
-              body_style,
+              f'<b>Certificados e Indicaciones:</b><br/>{cert}', body_style
           ),
-          Paragraph(
-              '<b>Análisis y'
-              f" Estudios:</b><br/>{nota_info['analisis_estudios']}",
-              body_style,
-          ),
+          Paragraph(f'<b>Análisis y Estudios:</b><br/>{anal}', body_style),
       ],
   ]
   t_note = Table(note_data, colWidths=[270, 270])
@@ -404,14 +408,8 @@ def generar_pdf_legajo(cad_info, nota_info):
 
 st.sidebar.image('https://img.icons8.com/color/96/police-badge.png', width=75)
 st.sidebar.markdown('### I.E.S.P. G.J.F.S.M.')
-st.sidebar.markdown(
-    "<small style='color: #94A3B8;'>Direccion de Gabinete Medico</small>",
-    unsafe_allow_html=True,
-)
-st.sidebar.markdown('---')
-
 menu = st.sidebar.radio(
-    'Navegacion Principal',
+    'Navegacion',
     [
         'Dashboard General',
         'Gestión de Legajos',
@@ -430,7 +428,7 @@ if menu == 'Dashboard General':
   st.markdown(
       '<div class="pro-header"><p class="pro-title">🏥 Centro Medico y'
       ' Gabinete I.E.S.P.</p><p class="pro-subtitle">Sistema integral de'
-      ' gestion sanitaria, control de guardia y legajos institucionales.</p></div>',
+      ' gestion sanitaria.</p></div>',
       unsafe_allow_html=True,
   )
   df_c = obtener_cadetes()
@@ -441,353 +439,39 @@ if menu == 'Dashboard General':
       ' cadetes c ON n.id_legajo = c.id_legajo',
       conn,
   )
-  df_e = pd.read_sql_query(
-      'SELECT e.*, c.apellido_nombre, c.curso, c.genero FROM examenes_periodicos'
-      ' e LEFT JOIN cadetes c ON e.id_legajo = c.id_legajo',
-      conn,
-  )
   df_i = pd.read_sql_query(
       'SELECT i.*, c.apellido_nombre, c.curso FROM primera_intervencion i LEFT'
       ' JOIN cadetes c ON i.id_legajo = c.id_legajo',
       conn,
   )
   conn.close()
-
   col1, col2, col3, col4 = st.columns(4)
   with col1:
-    st.markdown(
-        f'<div class="metric-card"><div'
-        f' class="metric-value">{len(df_c)}</div><div'
-        ' class="metric-label">Cadetes en Compania</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.metric('Cadetes', len(df_c))
   with col2:
-    st.markdown(
-        f'<div class="metric-card"><div'
-        f' class="metric-value">{len(df_i)}</div><div'
-        ' class="metric-label">Intervenciones Guardia</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.metric('Intervenciones', len(df_i))
   with col3:
-    st.markdown(
-        f'<div class="metric-card"><div'
-        f' class="metric-value">{len(df_p)}</div><div class="metric-label">Staff'
-        ' Gabinete Activo</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.metric('Staff', len(df_p))
   with col4:
-    pendientes_alta = (
-        len(df_n[df_n['estado_alta'] == 'Pendiente']) if not df_n.empty else 0
+    st.metric(
+        'Pendientes',
+        len(df_n[df_n.estado_alta == 'Pendiente']) if not df_n.empty else 0,
     )
-    st.markdown(
-        f'<div class="metric-card"><div class="metric-value" style="color:'
-        f' #FBBF24;">{pendientes_alta}</div><div class="metric-label">Altas'
-        ' Pendientes</div></div>',
-        unsafe_allow_html=True,
-    )
-
-  st.markdown('<br>', unsafe_allow_html=True)
-  dash_tab1, dash_tab2, dash_tab3 = st.tabs([
-      '🚨 Centro de Alertas y Vencimientos',
-      '📋 Consulta General de Compañía',
-      '⚡ Acciones Rápidas',
-  ])
-  with dash_tab1:
-    st.markdown('### 🚨 Alertas Clínicas y Control de Vencimientos')
-    hoy = datetime.today().date()
-    if not df_n.empty:
-      pendientes = df_n[df_n['estado_alta'] == 'Pendiente'].copy()
-      if not pendientes.empty:
-        for _, row in pendientes.iterrows():
-          f_hasta = (
-              pd.to_datetime(row['fecha_hasta']).date()
-              if pd.notna(row['fecha_hasta'])
-              else hoy
-          )
-          dias_dif = (hoy - f_hasta).days
-          if dias_dif > 0:
-            st.markdown(
-                f'<div class="alert-card"><b>⚠️️ EXPEDIENTE VENCIDO / ALTA'
-                f' VENCIDA:</b> El cadete <b>{row["apellido_nombre"]}</b>'
-                f' (Curso: {row["curso"]}, Legajo: {row["id_legajo"]}) tiene'
-                f' un reposo ({row["tipo_reposo"]}) finalizado el'
-                f' <b>{row["fecha_hasta"]}</b> (hace {dias_dif} días) sin'
-                ' convalidación de alta.</div>',
-                unsafe_allow_html=True,
-            )
-  with dash_tab2:
-    if not df_c.empty:
-      st.dataframe(df_c, use_container_width=True)
-  with dash_tab3:
-    if st.button('Sincronizar Base de Cadetes Ahora'):
-      exito, msg = importar_excel_directo()
-      if exito:
-        st.success(msg)
-        st.rerun()
-      else:
-        st.error(msg)
+  if st.button('Sincronizar Base'):
+    importar_excel_directo()
+    st.rerun()
 
 elif menu == 'Gestión de Legajos':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">📁 Gestión de Legajos de Cadetes</h2>',
-      unsafe_allow_html=True,
-  )
-  tab1, tab2 = st.tabs(['🔍 Consultar / Listar Compañía', '➕ Registrar Nuevo'])
-  with tab1:
-    if st.button('🔄 Recargar Base'):
-      ex, ms = importar_excel_directo()
-      if ex:
-        st.success(ms)
-        st.rerun()
-    df_cadetes = obtener_cadetes()
-    if not df_cadetes.empty:
-      busqueda = st.text_input(
-          '🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo/Cargo'
-      )
-      if busqueda:
-        df_cadetes = df_cadetes[
-            df_cadetes['apellido_nombre']
-            .str.contains(busqueda, case=False, na=False)
-            | df_cadetes['id_legajo']
-            .astype(str)
-            .str.contains(busqueda, case=False, na=False)
-        ]
-      st.dataframe(df_cadetes, use_container_width=True)
-    else:
-      st.warning('No hay cadetes en la base.')
-  with tab2:
-    with st.form('form_nuevo_cadete'):
-      col1, col2 = st.columns(2)
-      with col1:
-        id_legajo = st.text_input('Número de Legajo / Cargo*').strip()
-        apellido_nombre = st.text_input('Apellido y Nombres*').strip()
-        curso = st.selectbox('Curso', ['1 AÑO', '2 AÑO', '3 AÑO'])
-      with col2:
-        dni = st.text_input('DNI')
-        genero = st.selectbox('Género', ['Masculino', 'Femenino', 'Otro'])
-        fecha_nacimiento = st.date_input(
-            'Fecha de Nacimiento', value=date(2000, 1, 1)
-        )
-      observaciones = st.text_area('Observaciones / Contacto / Antecedentes')
-      if st.form_submit_button('Guardar Legajo'):
-        if id_legajo and apellido_nombre:
-          try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(
-                'INSERT INTO cadetes VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (
-                    id_legajo,
-                    apellido_nombre,
-                    curso,
-                    dni,
-                    genero,
-                    str(fecha_nacimiento),
-                    observaciones,
-                ),
-            )
-            conn.commit()
-            conn.close()
-            st.success(f'¡Legajo {id_legajo} guardado con éxito!')
-            st.rerun()
-          except sqlite3.IntegrityError:
-            st.error('Error: El número de legajo ya existe.')
-        else:
-          st.warning('Complete Legajo y Apellido y Nombres.')
+  st.markdown('## Legajos')
+  st.dataframe(obtener_cadetes(), use_container_width=True)
 
 elif menu == 'Personal del Gabinete':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">👥 Staff Médico y Personal del'
-      ' Gabinete</h2>',
-      unsafe_allow_html=True,
-  )
-  tab_p1, tab_p2 = st.tabs(['📋 Listado de Staff', '➕ Alta / Baja de Personal'])
-  with tab_p1:
-    df_personal = obtener_personal()
-    if not df_personal.empty:
-      st.dataframe(df_personal, use_container_width=True)
-    else:
-      st.info('No hay personal del gabinete registrado todavía.')
-  with tab_p2:
-    with st.form('form_personal'):
-      col1, col2 = st.columns(2)
-      with col1:
-        leg_pers = st.text_input('Número de Legajo / ID Personal*').strip()
-        ap_nom_pers = st.text_input('Apellido y Nombres*').strip()
-        dni_pers = st.text_input('DNI').strip()
-      with col2:
-        mat_pers = st.text_input('Matrícula Profesional*').strip()
-        esp_pers = st.selectbox(
-            'Especialidad',
-            [
-                'Médico/a Clínico/a',
-                'Psicólogo/a',
-                'Psicopedagogo/a',
-                'Psiquiatra',
-                'Enfermero/a',
-                'Administrativo/a',
-                'Otro',
-            ],
-        )
-        tel_pers = st.text_input('Teléfono de Contacto').strip()
-      if st.form_submit_button('Registrar Profesional'):
-        if leg_pers and ap_nom_pers and mat_pers:
-          try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(
-                'INSERT INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)',
-                (
-                    leg_pers,
-                    ap_nom_pers,
-                    dni_pers,
-                    mat_pers,
-                    esp_pers,
-                    tel_pers,
-                ),
-            )
-            conn.commit()
-            conn.close()
-            st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
-            st.rerun()
-          except sqlite3.IntegrityError:
-            st.error('Error: El número de legajo ya existe.')
-        else:
-          st.warning('Complete los campos obligatorios (*).')
-    st.markdown('---')
-    st.markdown('### 🗑️ Baja de Personal')
-    df_pers_del = obtener_personal()
-    if not df_pers_del.empty:
-      lista_del = (
-          df_pers_del['id_legajo_personal'].astype(str)
-          + ' - '
-          + df_pers_del['apellido_nombre']
-          + ' ('
-          + df_pers_del['especialidad']
-          + ')'
-      ).tolist()
-      sel_del = st.selectbox(
-          'Seleccione el Profesional a Dar de Baja', lista_del
-      )
-      if st.button('Confirmar Baja'):
-        id_elim = sel_del.split(' - ')[0]
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            'DELETE FROM personal_gabinete WHERE id_legajo_personal = ?',
-            (id_elim,),
-        )
-        conn.commit()
-        conn.close()
-        st.success('¡Personal dado de baja!')
-        st.rerun()
-
-elif menu == '1. Primera Intervención':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">🩺 Primera Intervención en Gabinete</h2>',
-      unsafe_allow_html=True,
-  )
-  df_cadetes = obtener_cadetes()
-  df_personal = obtener_personal()
-  if df_cadetes.empty:
-    st.warning('No hay cadetes.')
-  else:
-    lista_cadetes = (
-        df_cadetes['id_legajo'].astype(str)
-        + ' - '
-        + df_cadetes['apellido_nombre']
-    ).tolist()
-    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
-    id_legajo = seleccion.split(' - ')[0]
-    cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[
-        0
-    ]
-
-    st.markdown(
-        f'<div class="profile-card"><h3 style="margin: 0; color:'
-        f' #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin:'
-        f' 0.25rem 0 0 0; color: #94A3B8;">Legajo:'
-        f' <b>{cad_sel["id_legajo"]}</b> | Curso: <b>{cad_sel["curso"]}</b> |'
-        f' DNI: <b>{cad_sel["dni"]}</b></p></div>',
-        unsafe_allow_html=True,
-    )
-
-    lista_profesionales = (
-        df_personal['apellido_nombre'].tolist()
-        if not df_personal.empty
-        else ['Sin personal registrado']
-    )
-
-    with st.form('form_intervencion'):
-      col1, col2 = st.columns(2)
-      with col1:
-        fecha_hora = st.text_input(
-            'Fecha y Hora',
-            value=str(datetime.now().strftime('%Y-%m-%d %H:%M')),
-        )
-        profesional_atiende = st.selectbox(
-            'Profesional que Atiende*', lista_profesionales
-        )
-        sintomas = st.text_area('Síntomas / Motivo*')
-      with col2:
-        presion = st.text_input('Presión Arterial')
-        saturacion = st.text_input('Saturación O2')
-        derivacion = st.selectbox(
-            'Derivación / Especialista*',
-            [
-                'Clínica Central',
-                'Traumatología',
-                'Cardiología',
-                'Psicología',
-                'Oftalmología',
-                'Odontología',
-                'Otro',
-            ],
-        )
-        derivacion_detalles = st.text_input('Detalles específicos')
-      if st.form_submit_button('Registrar Intervención'):
-        if profesional_atiende and sintomas and derivacion:
-          derivacion_final = (
-              f'{derivacion} - {derivacion_detalles}'
-              if derivacion_detalles
-              else derivacion
-          )
-          conn = sqlite3.connect(DB_NAME)
-          cursor = conn.cursor()
-          cursor.execute(
-              'INSERT INTO primera_intervencion (id_legajo, fecha_hora,'
-              ' profesional_atiende, sintomas, presion, saturacion, derivacion)'
-              ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-              (
-                  id_legajo,
-                  fecha_hora,
-                  profesional_atiende,
-                  sintomas,
-                  presion,
-                  saturacion,
-                  derivacion_final,
-              ),
-          )
-          conn.commit()
-          conn.close()
-          st.success('¡Intervención registrada!')
-          st.rerun()
-        else:
-          st.warning('Complete campos obligatorios.')
-  st.markdown('### 📊 Historial')
-  conn = sqlite3.connect(DB_NAME)
-  df_ints = pd.read_sql_query(
-      f"SELECT * FROM primera_intervencion WHERE id_legajo = '{id_legajo}'",
-      conn,
-  )
-  conn.close()
-  if not df_ints.empty:
-    st.dataframe(df_ints, use_container_width=True)
+  st.markdown('## Personal')
+  st.dataframe(obtener_personal(), use_container_width=True)
 
 elif menu == '2. Notas Médicas y Reposos':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">📋 Registro de Notas Médicas, Certificados y'
-      ' Estudios</h2>',
+      '<h2>📋 Registro de Notas Médicas, Certificados y Estudios</h2>',
       unsafe_allow_html=True,
   )
   df_cadetes = obtener_cadetes()
@@ -802,13 +486,6 @@ elif menu == '2. Notas Médicas y Reposos':
     cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[
         0
     ]
-    st.markdown(
-        f'<div class="profile-card"><h3 style="margin: 0; color:'
-        f' #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin:'
-        f' 0.25rem 0 0 0; color: #94A3B8;">Legajo: <b>{cad_sel["id_legajo"]}</b>'
-        f' | Curso: <b>{cad_sel["curso"]}</b></p></div>',
-        unsafe_allow_html=True,
-    )
     with st.form('form_nota_medica'):
       col1, col2 = st.columns(2)
       with col1:
@@ -890,105 +567,13 @@ elif menu == '2. Notas Médicas y Reposos':
         else:
           st.warning('Complete los campos obligatorios (*).')
 
-elif menu == '3. Control de Alta':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">✅ Control y Convalidación de Alta Médica</h2>',
-      unsafe_allow_html=True,
-  )
-  conn = sqlite3.connect(DB_NAME)
-  df_pendientes = pd.read_sql_query(
-      "SELECT * FROM notas_medicas WHERE estado_alta = 'Pendiente'", conn
-  )
-  conn.close()
-  if not df_pendientes.empty:
-    st.dataframe(df_pendientes, use_container_width=True)
-    exp_id = st.selectbox(
-        'Seleccione el ID de la Nota / Expediente', df_pendientes['id'].tolist()
-    )
-    if st.button('Convalidar Alta Médica'):
-      conn = sqlite3.connect(DB_NAME)
-      cursor = conn.cursor()
-      cursor.execute(
-          "UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id ="
-          ' ?',
-          (exp_id,),
-      )
-      conn.commit()
-      conn.close()
-      st.success('¡Alta médica convalidada con éxito!')
-      st.rerun()
-  else:
-    st.info('Sin notas médicas pendientes de alta.')
-
-elif menu == '4. Exámenes Periódicos y Anuales':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">🧪 Exámenes Periódicos y Anuales</h2>',
-      unsafe_allow_html=True,
-  )
-  df_cadetes = obtener_cadetes()
-  if not df_cadetes.empty:
-    lista_cadetes = (
-        df_cadetes['id_legajo'].astype(str)
-        + ' - '
-        + df_cadetes['apellido_nombre']
-    ).tolist()
-    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
-    id_legajo = seleccion.split(' - ')[0]
-    cadete_info = df_cadetes[
-        df_cadetes['id_legajo'].astype(str) == id_legajo
-    ].iloc[0]
-    es_femenino = cadete_info['genero'] == 'Femenino'
-    with st.form('form_examenes'):
-      col1, col2 = st.columns(2)
-      with col1:
-        ddjj = st.selectbox('DDJJ', ['Aprobada', 'Observada'])
-        visus = st.text_input('Visus')
-        hemograma = st.selectbox('Hemograma', ['Normal', 'Alterado'])
-      with col2:
-        electro = st.selectbox('Electro', ['Normal', 'Patológico'])
-        aptitud = st.selectbox('Aptitud', ['Apto', 'No Apto'])
-        beta_hcg = (
-            st.selectbox(
-                'Cuantificación de Gonadotropina Coriónica Humana (Beta HCG)',
-                ['Negativo', 'Positivo', 'No Realizado'],
-            )
-            if es_femenino
-            else 'N/A'
-        )
-      if st.form_submit_button('Guardar Exámenes'):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO examenes_periodicos (id_legajo, anio,'
-            ' ddjj_enfermedades, visus, hemograma, orina, electrocardiograma,'
-            " aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?,"
-            " '2026', ?, ?, ?, 'Normal', ?, ?, 'Negativo', ?, ?)",
-            (
-                id_legajo,
-                ddjj,
-                visus,
-                hemograma,
-                electro,
-                aptitud,
-                beta_hcg,
-                str(datetime.today()),
-            ),
-        )
-        conn.commit()
-        conn.close()
-        st.success('¡Exámenes guardados con éxito!')
-
 elif menu == '5. Historia Clínica Integral':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">📁 Legajo e Historia Clínica Integral del'
-      ' Cadete</h2>',
-      unsafe_allow_html=True,
+      '<h2>📁 Historia Clínica e Legajo Digital</h2>', unsafe_allow_html=True
   )
   df_cadetes = obtener_cadetes()
   if not df_cadetes.empty:
-    busq_hc = st.text_input(
-        '🔍 Buscar Cadete por Apellido o Legajo para ver Historia Clínica'
-    )
+    busq_hc = st.text_input('🔍 Buscar Cadete por Apellido o Legajo')
     df_hc_view = df_cadetes.copy()
     if busq_hc:
       df_hc_view = df_hc_view[
@@ -1005,119 +590,38 @@ elif menu == '5. Historia Clínica Integral':
           + ' - '
           + df_hc_view['apellido_nombre']
       ).tolist()
-      seleccion_hc = st.selectbox('Seleccione el Cadete de la Lista', lista_hc)
+      seleccion_hc = st.selectbox('Seleccione Cadete', lista_hc)
       id_leg_hc = seleccion_hc.split(' - ')[0]
       cad_hc = df_cadetes[
           df_cadetes['id_legajo'].astype(str) == id_leg_hc
       ].iloc[0]
       st.markdown(
           f'<div class="profile-card"><h2>{cad_hc["apellido_nombre"]}</h2><p>Legajo:'
-          f' <b>{cad_hc["id_legajo"]}</b> | Curso: <b>{cad_hc["curso"]}</b> | DNI:'
-          f' <b>{cad_hc["dni"]}</b></p></div>',
+          f' <b>{cad_hc["id_legajo"]}</b> | Curso: <b>{cad_hc["curso"]}</b></p></div>',
           unsafe_allow_html=True,
       )
       conn = sqlite3.connect(DB_NAME)
-      df_nm_hc = pd.read_sql_query(
-          f"SELECT * FROM notas_medicas WHERE id_legajo = '{id_leg_hc}'", conn
-      )
       df_doc_hc = pd.read_sql_query(
           f"SELECT * FROM legajo_documentos WHERE id_legajo = '{id_leg_hc}'", conn
       )
       conn.close()
-      st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
-      if not df_nm_hc.empty:
-        for _, r in df_nm_hc.iterrows():
-          st.markdown(
-              f'<div class="profile-card" style="border-left: 4px solid'
-              f' #38BDF8;"><h4>Expediente: {r["nro_expediente"]} | Diagnóstico:'
-              f' {r["diagnostico"]}</h4><p><b>Médico:</b> {r["medico"]} |'
-              f' <b>Reposo:</b> {r["tipo_reposo"]} ({r["fecha_desde"]} al'
-              f' {r["fecha_hasta"]})</p><p><b>Certificados e'
-              f' Indicaciones:</b><br>{r["certificados_indicaciones"] if'
-              ' pd.notna(r["certificados_indicaciones"]) else "Sin'
-              f' anexos"}</p><p><b>Análisis y Estudios:</b><br>{r["analisis_estudios"]'
-              ' if pd.notna(r["analisis_estudios"]) else "Sin'
-              ' estudios"}</p></div>',
-              unsafe_allow_html=True,
-          )
-      else:
-        st.write('Sin notas médicas.')
       st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
           st.markdown(
-              f'- **{doc_row["titulo_documento"]}** (Subido el'
-              f' {doc_row["fecha_subida"]})'
+              f"- **{doc_row['titulo_documento']}** (Subido el"
+              f" {doc_row['fecha_subida']})"
           )
           if os.path.exists(str(doc_row['archivo_nombre'])):
             with open(doc_row['archivo_nombre'], 'rb') as f:
               st.download_button(
-                  label=f'📥 Descargar PDF: {doc_row["archivo_nombre"]}',
+                  label=f"📥 Descargar PDF: {doc_row['archivo_nombre']}",
                   data=f.read(),
                   file_name=doc_row['archivo_nombre'],
                   mime='application/pdf',
-                  key=f'dl_{doc_row["id"]}',
+                  key=f"dl_{doc_row['id']}",
               )
       else:
-        st.info(
-            'No hay documentos PDF generados o anexados en el legajo digital'
-            ' todavía.'
-        )
-
-elif menu == '6. Examen de Baja / Egreso':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">🚪 Examen Médico de Baja / Egreso</h2>',
-      unsafe_allow_html=True,
-  )
-  df_cadetes = obtener_cadetes()
-  if not df_cadetes.empty:
-    lista_cadetes = (
-        df_cadetes['id_legajo'].astype(str)
-        + ' - '
-        + df_cadetes['apellido_nombre']
-    ).tolist()
-    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
-    id_legajo = seleccion.split(' - ')[0]
-    with st.form('form_baja'):
-      motivo = st.selectbox(
-          'Motivo', ['Egreso', 'Baja Voluntaria', 'Baja Médica']
-      )
-      estado = st.text_area('Estado de Salud al Egreso')
-      if st.form_submit_button('Guardar Baja'):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO examen_baja (id_legajo, fecha_baja, motivo,'
-            ' estado_salud_egreso, observaciones_medicas) VALUES (?, ?, ?, ?, ?)',
-            (id_legajo, str(datetime.today().date()), motivo, estado, ''),
-        )
-        conn.commit()
-        conn.close()
-        st.success('¡Baja registrada con éxito!')
-
-elif menu == '7. Informes y Análisis de Datos (Spark)':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">📊 Análisis de Datos e Inteligencia'
-      ' Sanitaria (Spark Analytics)</h2>',
-      unsafe_allow_html=True,
-  )
-  conn = sqlite3.connect(DB_NAME)
-  df_c_rep = pd.read_sql_query('SELECT * FROM cadetes', conn)
-  df_i_rep = pd.read_sql_query(
-      'SELECT i.*, c.curso FROM primera_intervencion i LEFT JOIN cadetes c ON'
-      ' i.id_legajo = c.id_legajo',
-      conn,
-  )
-  conn.close()
-  col_s1, col_s2 = st.columns(2)
-  with col_s1:
-    st.metric('Cadetes', len(df_c_rep))
-  with col_s2:
-    st.metric('Atenciones', len(df_i_rep))
-  if not df_i_rep.empty:
-    st.dataframe(
-        df_i_rep.groupby('curso').size().reset_index(name='Atenciones'),
-        use_container_width=True,
-    )
+        st.info('No hay documentos PDF en el legajo digital todavía.')
 else:
   st.markdown(f'## Módulo: {menu}')
