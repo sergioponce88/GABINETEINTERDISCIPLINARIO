@@ -3,9 +3,21 @@ import os
 import sqlite3
 import pandas as pd
 import streamlit as st
+import reportlab
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    KeepTogether,
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 st.set_page_config(
-    page_title="Gabinete Médico | I.E.S.P. G.J.F.S.M.",
+    page_title="Gabinete Medico | I.E.S.P. G.J.F.S.M.",
     page_icon="🛡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -104,9 +116,9 @@ st.markdown("""<style>
 </style>
 """, unsafe_allow_html=True)
 
-DB_NAME = "gabinete_iesp.db"
-EXCEL_FILE = "LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx"
-UPLOAD_DIR = "documentos_legajos"
+DB_NAME = 'gabinete_iesp.db'
+EXCEL_FILE = 'LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx'
+UPLOAD_DIR = 'documentos_legajos'
 
 if not os.path.exists(UPLOAD_DIR):
   os.makedirs(UPLOAD_DIR)
@@ -114,7 +126,7 @@ if not os.path.exists(UPLOAD_DIR):
 
 def importar_excel_directo():
   if not os.path.exists(EXCEL_FILE):
-    return False, f"No se encontró el archivo Excel: {EXCEL_FILE}"
+    return False, f'No se encontro el archivo Excel: {EXCEL_FILE}'
   try:
     df_excel = pd.read_excel(EXCEL_FILE, sheet_name=0)
     conn = sqlite3.connect(DB_NAME)
@@ -130,7 +142,7 @@ def importar_excel_directo():
       )
       curso = str(row.get('CURSO', '1 AÑO')).strip()
       dni = str(row.get('DNI', '')).strip()
-      genero = "Masculino"
+      genero = 'Masculino'
       f_nac = (
           str(row.get('FECHA DE NACIMIENTO', '')).split(' ')[0]
           if pd.notna(row.get('FECHA DE NACIMIENTO'))
@@ -149,9 +161,9 @@ def importar_excel_directo():
       cargados += 1
     conn.commit()
     conn.close()
-    return True, f"Se sincronizaron {cargados} cadetes correctamente."
+    return True, f'Sincronizados {cargados} cadetes.'
   except Exception as e:
-    return False, f"Error al procesar el Excel: {str(e)}"
+    return False, str(e)
 
 
 def init_db():
@@ -241,6 +253,170 @@ def obtener_personal():
   return df
 
 
+def generar_pdf_legajo(cad_info, nota_info):
+  pdf_filename = f"Legajo_Medico_{cad_info['id_legajo']}.pdf"
+  doc = SimpleDocTemplate(
+      pdf_filename,
+      pagesize=letter,
+      rightMargin=40,
+      leftMargin=40,
+      topMargin=40,
+      bottomMargin=40,
+  )
+  styles = getSampleStyleSheet()
+  normal_style = styles['Normal']
+  title_style = ParagraphStyle(
+      'DocTitle',
+      parent=normal_style,
+      fontName='Helvetica-Bold',
+      fontSize=15,
+      leading=18,
+      textColor=colors.HexColor('#1E3A8A'),
+      alignment=1,
+  )
+  subtitle_style = ParagraphStyle(
+      'DocSubtitle',
+      parent=normal_style,
+      fontName='Helvetica',
+      fontSize=9,
+      leading=13,
+      textColor=colors.HexColor('#64748B'),
+      alignment=1,
+  )
+  section_heading = ParagraphStyle(
+      'SectionHeading',
+      parent=normal_style,
+      fontName='Helvetica-Bold',
+      fontSize=11,
+      leading=15,
+      textColor=colors.HexColor('#1E3A8A'),
+      spaceBefore=8,
+      spaceAfter=4,
+  )
+  body_style = ParagraphStyle(
+      'BodyPro',
+      parent=normal_style,
+      fontName='Helvetica',
+      fontSize=9,
+      leading=13,
+      textColor=colors.HexColor('#1F2937'),
+  )
+  elements = []
+  elements.append(
+      Paragraph('INSTITUTO DE ENSEÑANZA SUPERIOR DE POLICÍA', title_style)
+  )
+  elements.append(
+      Paragraph(
+          '«Gral. José Francisco de San Martín»<br/>Dirección de Gabinete'
+          ' Interdisciplinario',
+          subtitle_style,
+      )
+  )
+  elements.append(Spacer(1, 10))
+  cadet_info_data = [
+      [
+          Paragraph(f"<b>Cadete:</b> {cad_info['apellido_nombre']}", body_style),
+          Paragraph(f"<b>Legajo:</b> {cad_info['id_legajo']}", body_style),
+      ],
+      [
+          Paragraph(f"<b>Curso:</b> {cad_info['curso']}", body_style),
+          Paragraph(f"<b>DNI:</b> {cad_info['dni']}", body_style),
+      ],
+  ]
+  t_cadet = Table(cadet_info_data, colWidths=[270, 270])
+  t_cadet.setStyle(
+      TableStyle([
+          ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+          ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
+          ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+          ('PADDING', (0, 0), (-1, -1), 6),
+      ])
+  )
+  elements.append(t_cadet)
+  elements.append(Spacer(1, 10))
+  elements.append(
+      Paragraph('ANEXO DE EXPEDIENTE Y NOTA MÉDICA', section_heading)
+  )
+  cert = (
+      nota_info['certificados_indicaciones']
+      if nota_info['certificados_indicaciones']
+      else 'Sin transcripción'
+  )
+  anal = (
+      nota_info['analisis_estudios']
+      if nota_info['analisis_estudios']
+      else 'Sin estudios'
+  )
+  note_data = [
+      [
+          Paragraph(
+              f"<b>Nro. Expediente:</b> {nota_info['nro_expediente']}",
+              body_style,
+          ),
+          Paragraph(f"<b>Fecha:</b> {str(datetime.today().date())}", body_style),
+      ],
+      [
+          Paragraph(
+              f"<b>Médico Tratante:</b> {nota_info['medico']}", body_style
+          ),
+          Paragraph(
+              f"<b>Tipo de Reposo:</b> {nota_info['tipo_reposo']}"
+              f" ({nota_info['fecha_desde']} al {nota_info['fecha_hasta']})",
+              body_style,
+          ),
+      ],
+      [
+          Paragraph(
+              f"<b>Diagnóstico Médico:</b><br/>{nota_info['diagnostico']}",
+              body_style,
+          ),
+          Paragraph(
+              f"<b>Medicamentos:</b><br/>{nota_info['medicamentos']}", body_style
+          ),
+      ],
+      [
+          Paragraph(
+              f'<b>Certificados e Indicaciones:</b><br/>{cert}', body_style
+          ),
+          Paragraph(f'<b>Análisis y Estudios:</b><br/>{anal}', body_style),
+      ],
+  ]
+  t_note = Table(note_data, colWidths=[270, 270])
+  t_note.setStyle(
+      TableStyle([
+          ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFFFFF')),
+          ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#94A3B8')),
+          ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+          ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+          ('PADDING', (0, 0), (-1, -1), 6),
+      ])
+  )
+  elements.append(t_note)
+  elements.append(Spacer(1, 20))
+  sig_data = [[
+      Paragraph(
+          '____________________________________________<br/><b>Firma y Sello'
+          ' Profesional / Médico</b>',
+          body_style,
+      ),
+      Paragraph(
+          '____________________________________________<br/><b>Firma y Sello'
+          ' Dirección de Gabinete</b>',
+          body_style,
+      ),
+  ]]
+  t_sig = Table(sig_data, colWidths=[270, 270])
+  t_sig.setStyle(
+      TableStyle([
+          ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+          ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+      ])
+  )
+  elements.append(KeepTogether(t_sig))
+  doc.build(elements)
+  return pdf_filename
+
+
 st.sidebar.image('https://img.icons8.com/color/96/police-badge.png', width=75)
 st.sidebar.markdown('### I.E.S.P. G.J.F.S.M.')
 st.sidebar.markdown(
@@ -267,9 +443,9 @@ menu = st.sidebar.radio(
 
 if menu == 'Dashboard General':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">🏥 Centro Médico y'
+      '<div class="pro-header"><p class="pro-title">🏥 Centro Medico y'
       ' Gabinete I.E.S.P.</p><p class="pro-subtitle">Sistema integral de'
-      ' gestión sanitaria, control de guardia y legajos institucionales.</p></div>',
+      ' gestion sanitaria, control de guardia y legajos institucionales.</p></div>',
       unsafe_allow_html=True,
   )
   df_c = obtener_cadetes()
@@ -278,6 +454,11 @@ if menu == 'Dashboard General':
   df_n = pd.read_sql_query(
       'SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN'
       ' cadetes c ON n.id_legajo = c.id_legajo',
+      conn,
+  )
+  df_e = pd.read_sql_query(
+      'SELECT e.*, c.apellido_nombre, c.curso, c.genero FROM examenes_periodicos'
+      ' e LEFT JOIN cadetes c ON e.id_legajo = c.id_legajo',
       conn,
   )
   df_i = pd.read_sql_query(
@@ -635,13 +816,6 @@ elif menu == '2. Notas Médicas y Reposos':
       ' Estudios</h2>',
       unsafe_allow_html=True,
   )
-  st.markdown(
-      "<p style='color: #94A3B8;'>Cargue el expediente, tipo de reposo,"
-      ' certificados médicos, indicaciones terapéuticas y **suba o anexe los'
-      ' archivos PDF** presentados por el cadete.</p>',
-      unsafe_allow_html=True,
-  )
-
   df_cadetes = obtener_cadetes()
   if not df_cadetes.empty:
     lista_cadetes = (
@@ -661,7 +835,6 @@ elif menu == '2. Notas Médicas y Reposos':
         f' | Curso: <b>{cad_sel["curso"]}</b></p></div>',
         unsafe_allow_html=True,
     )
-
     with st.form('form_nota_medica'):
       col1, col2 = st.columns(2)
       with col1:
@@ -678,25 +851,20 @@ elif menu == '2. Notas Médicas y Reposos':
         fecha_desde = st.date_input('Reposo Desde', value=datetime.today().date())
         fecha_hasta = st.date_input('Reposo Hasta', value=datetime.today().date())
         certificados_indicaciones = st.text_area(
-            'Certificados e Indicaciones Médicas (Detalle)'
+            'Certificados e Indicaciones Médicas'
         )
         analisis_estudios = st.text_area(
-            'Análisis de Laboratorio y Estudios (Detalle)'
+            'Análisis de Laboratorio y Estudios Complementarios'
         )
-
       medicamentos = st.text_input('Medicamentos Recetados')
       submitted_nota = st.form_submit_button(
           'Guardar Nota Médica y Expediente'
       )
 
-    # Subida de PDF adjunto real (fuera del form principal para mejor manejo de archivos en Streamlit)
-    st.markdown(
-        '---<h4 style="color: #38BDF8;">📎 Anexar Documento PDF (Certificado /'
-        ' Estudios / Receta)</h4>',
-        unsafe_allow_html=True,
-    )
-    uploaded_pdf = st.file_uploader(
-        'Seleccione el archivo PDF presentado por el cadete', type=['pdf']
+    uploaded_file = st.file_uploader(
+        '📎 Adjuntar Archivo PDF Externo (Certificado / Análisis / Estudio'
+        ' escaneado)',
+        type=['pdf'],
     )
 
     if submitted_nota:
@@ -723,28 +891,53 @@ elif menu == '2. Notas Médicas y Reposos':
         )
         conn.commit()
 
-        # Si el usuario subió un PDF en el uploader, guardarlo en la carpeta y registrarlo en legajo_documentos
-        if uploaded_pdf is not None:
-          pdf_path = os.path.join(
-              UPLOAD_DIR, f"{id_legajo}_{nro_expediente}_{uploaded_pdf.name}"
+        nota_dict = {
+            'nro_expediente': nro_expediente,
+            'medico': medico,
+            'diagnostico': diagnostico,
+            'tipo_reposo': tipo_reposo,
+            'fecha_desde': str(fecha_desde),
+            'fecha_hasta': str(fecha_hasta),
+            'medicamentos': medicamentos,
+            'certificados_indicaciones': certificados_indicaciones,
+            'analisis_estudios': analisis_estudios,
+        }
+        pdf_path = generar_pdf_legajo(cad_sel, nota_dict)
+        cursor.execute(
+            'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
+            ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+            ' VALUES (?, ?, ?, ?, ?, ?)',
+            (
+                id_legajo,
+                f'Expediente {nro_expediente} - Nota Médica y Certificado',
+                'PDF Oficial',
+                str(datetime.today().date()),
+                pdf_path,
+                'Generado automáticamente',
+            ),
+        )
+
+        if uploaded_file is not None:
+          ext_path = os.path.join(
+              UPLOAD_DIR, f"{id_legajo}_{nro_expediente}_{uploaded_file.name}"
           )
-          with open(pdf_path, 'wb') as f:
-            f.write(uploaded_pdf.getbuffer())
+          with open(ext_path, 'wb') as f_ext:
+            f_ext.write(uploaded_file.getbuffer())
           cursor.execute(
               'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
               ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
               ' VALUES (?, ?, ?, ?, ?, ?)',
               (
                   id_legajo,
-                  f'Certificado / Estudio - Exp: {nro_expediente}',
-                  'PDF Adjunto Externo',
+                  f'Expediente {nro_expediente} - Archivo Externo Adjunto',
+                  'PDF Externo',
                   str(datetime.today().date()),
-                  pdf_path,
-                  diagnostico,
+                  ext_path,
+                  'Subido por usuario',
               ),
           )
-          conn.commit()
 
+        conn.commit()
         conn.close()
         st.success(
             '¡Nota médica y documentación PDF anexadas con éxito al legajo'
@@ -922,8 +1115,8 @@ elif menu == '5. Historia Clínica Integral':
               )
       else:
         st.info(
-            'No hay documentos PDF en el legajo digital todavía (certificados o'
-            ' estudios subidos).'
+            'No hay documentos PDF generados o anexados en el legajo digital'
+            ' todavía.'
         )
 
 elif menu == '6. Examen de Baja / Egreso':
