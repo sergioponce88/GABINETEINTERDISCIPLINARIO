@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
 import sqlite3
 import pandas as pd
@@ -116,9 +116,9 @@ st.markdown("""<style>
 </style>
 """, unsafe_allow_html=True)
 
-DB_NAME = 'gabinete_iesp.db'
-EXCEL_FILE = 'LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx'
-UPLOAD_DIR = 'documentos_legajos'
+DB_NAME = "gabinete_iesp.db"
+EXCEL_FILE = "LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx"
+UPLOAD_DIR = "documentos_legajos"
 
 if not os.path.exists(UPLOAD_DIR):
   os.makedirs(UPLOAD_DIR)
@@ -126,7 +126,7 @@ if not os.path.exists(UPLOAD_DIR):
 
 def importar_excel_directo():
   if not os.path.exists(EXCEL_FILE):
-    return False, f'No se encontro el archivo Excel: {EXCEL_FILE}'
+    return False, f"No se encontró el archivo Excel: {EXCEL_FILE}"
   try:
     df_excel = pd.read_excel(EXCEL_FILE, sheet_name=0)
     conn = sqlite3.connect(DB_NAME)
@@ -142,7 +142,7 @@ def importar_excel_directo():
       )
       curso = str(row.get('CURSO', '1 AÑO')).strip()
       dni = str(row.get('DNI', '')).strip()
-      genero = 'Masculino'
+      genero = "Masculino"
       f_nac = (
           str(row.get('FECHA DE NACIMIENTO', '')).split(' ')[0]
           if pd.notna(row.get('FECHA DE NACIMIENTO'))
@@ -161,9 +161,9 @@ def importar_excel_directo():
       cargados += 1
     conn.commit()
     conn.close()
-    return True, f'Se sincronizaron {cargados} cadetes correctamente.'
+    return True, f"Se sincronizaron {cargados} cadetes correctamente."
   except Exception as e:
-    return False, f'Error al procesar el Excel: {str(e)}'
+    return False, f"Error al procesar el Excel: {str(e)}"
 
 
 def init_db():
@@ -443,9 +443,9 @@ menu = st.sidebar.radio(
 
 if menu == 'Dashboard General':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">🏥 Centro Medico y'
+      '<div class="pro-header"><p class="pro-title">🏥 Centro Médico y'
       ' Gabinete I.E.S.P.</p><p class="pro-subtitle">Sistema integral de'
-      ' gestion sanitaria, control de guardia y legajos institucionales.</p></div>',
+      ' gestión sanitaria, control de guardia y legajos institucionales.</p></div>',
       unsafe_allow_html=True,
   )
   df_c = obtener_cadetes()
@@ -835,7 +835,6 @@ elif menu == '2. Notas Médicas y Reposos':
         f' | Curso: <b>{cad_sel["curso"]}</b></p></div>',
         unsafe_allow_html=True,
     )
-
     with st.form('form_nota_medica'):
       col1, col2 = st.columns(2)
       with col1:
@@ -889,7 +888,6 @@ elif menu == '2. Notas Médicas y Reposos':
             ),
         )
         conn.commit()
-
         nota_dict = {
             'nro_expediente': nro_expediente,
             'medico': medico,
@@ -915,7 +913,6 @@ elif menu == '2. Notas Médicas y Reposos':
                 'Generado automáticamente',
             ),
         )
-
         if uploaded_file is not None:
           ext_path = os.path.join(
               UPLOAD_DIR, f"{id_legajo}_{nro_expediente}_{uploaded_file.name}"
@@ -935,7 +932,6 @@ elif menu == '2. Notas Médicas y Reposos':
                   'Subido por usuario',
               ),
           )
-
         conn.commit()
         conn.close()
         st.success(
@@ -947,33 +943,164 @@ elif menu == '2. Notas Médicas y Reposos':
 
 elif menu == '3. Control de Alta':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">✅ Control y Convalidación de Alta Médica</h2>',
+      '<h2 style="color: #FFFFFF;">✅ Control y Gestión de Altas Médicas</h2>',
       unsafe_allow_html=True,
   )
+  st.markdown(
+      "<p style='color: #94A3B8;'>Convalide el alta médica reglamentaria o"
+      ' registre la extensión de reposo por presentación de nuevos'
+      ' certificados o días adicionales.</p>',
+      unsafe_allow_html=True,
+  )
+
   conn = sqlite3.connect(DB_NAME)
   df_pendientes = pd.read_sql_query(
-      "SELECT * FROM notas_medicas WHERE estado_alta = 'Pendiente'", conn
+      "SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN"
+      " cadetes c ON n.id_legajo = c.id_legajo WHERE n.estado_alta = 'Pendiente'",
+      conn,
   )
   conn.close()
-  if not df_pendientes.empty:
-    st.dataframe(df_pendientes, use_container_width=True)
-    exp_id = st.selectbox(
-        'Seleccione el ID de la Nota / Expediente', df_pendientes['id'].tolist()
-    )
-    if st.button('Convalidar Alta Médica'):
-      conn = sqlite3.connect(DB_NAME)
-      cursor = conn.cursor()
-      cursor.execute(
-          "UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id ="
-          ' ?',
-          (exp_id,),
+
+  alta_tab1, alta_tab2 = st.tabs([
+      '1️⃣ Convalidar Alta Médica',
+      '2️⃣ Extensión de Reposo / Prórroga',
+  ])
+
+  with alta_tab1:
+    st.markdown('### Convalidación de Alta por Cierre de Reposo')
+    if not df_pendientes.empty:
+      st.dataframe(
+          df_pendientes[[
+              'id',
+              'nro_expediente',
+              'id_legajo',
+              'apellido_nombre',
+              'curso',
+              'medico',
+              'tipo_reposo',
+              'fecha_hasta',
+          ]],
+          use_container_width=True,
       )
-      conn.commit()
-      conn.close()
-      st.success('¡Alta médica convalidada con éxito!')
-      st.rerun()
-  else:
-    st.info('Sin notas médicas pendientes de alta.')
+      exp_id = st.selectbox(
+          'Seleccione el ID del Expediente para Convalidar Alta',
+          df_pendientes['id'].tolist(),
+          key='sel_alta',
+      )
+      if st.button('Convalidar Alta Médica Oficial'):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id"
+            ' = ?',
+            (exp_id,),
+        )
+        conn.commit()
+        conn.close()
+        st.success('¡Alta médica convalidada con éxito!')
+        st.rerun()
+    else:
+      st.info('ℹ️ No hay expedientes pendientes de alta.')
+
+  with alta_tab2:
+    st.markdown('### Registro de Prórroga o Más Días de Reposo')
+    st.markdown(
+        "<p style='color: #94A3B8;'>Si el cadete presenta un nuevo certificado"
+        ' médico extendiendo sus días de reposo o un nuevo parte, registre aquí'
+        ' la ampliación del expediente.</p>',
+        unsafe_allow_html=True,
+    )
+    if not df_pendientes.empty:
+      cadetes_pendientes_lista = (
+          df_pendientes['id_legajo'].astype(str)
+          + ' - '
+          + df_pendientes['apellido_nombre']
+          + ' (Exp: '
+          + df_pendientes['nro_expediente']
+          + ')'
+      ).tolist()
+      sel_ext = st.selectbox(
+          'Seleccione Expediente / Cadete para Extender Reposo',
+          cadetes_pendientes_lista,
+      )
+      id_leg_ext = sel_ext.split(' - ')[0]
+      exp_ref = sel_ext.split('Exp: ')[1].split(')')[0]
+
+      with st.form('form_extension_reposo'):
+        col_e1, col_e2 = st.columns(2)
+        with col_e1:
+          nuevo_medico = st.text_input('Médico Tratante de Prórroga*')
+          nuevo_diagnostico = st.text_area(
+              'Diagnóstico / Motivo de Extensión*'
+          )
+          dias_adicionales = st.number_input(
+              'Días de Reposo Adicionales', min_value=1, max_value=90, value=7
+          )
+        with col_e2:
+          nueva_fecha_hasta = st.date_input(
+              'Nueva Fecha de Finalización de Reposo',
+              value=datetime.today().date() + timedelta(days=7),
+          )
+          nuevos_certificados = st.text_area(
+              '📄 Observaciones del Nuevo Certificado Presentado'
+          )
+
+        uploaded_ext = st.file_uploader(
+            '📎 Adjuntar PDF del Nuevo Certificado de Prórroga',
+            type=['pdf'],
+            key='up_ext',
+        )
+
+        if st.form_submit_button('Registrar Prórroga y Extender Reposo'):
+          if nuevo_medico and nuevo_diagnostico:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute(
+                'UPDATE notas_medicas SET fecha_hasta = ?, medicamentos = ?'
+                ' WHERE id_legajo = ? AND nro_expediente = ? AND estado_alta ='
+                " 'Pendiente'",
+                (
+                    str(nueva_fecha_hasta),
+                    (
+                        f'Prórroga de {dias_adicionales} días. Motivo:'
+                        f' {nuevo_diagnostico}'
+                    ),
+                    id_leg_ext,
+                    exp_ref,
+                ),
+            )
+
+            if uploaded_ext is not None:
+              ext_path = os.path.join(
+                  UPLOAD_DIR,
+                  f'{id_leg_ext}_PRORROGA_{uploaded_ext.name}',
+              )
+              with open(ext_path, 'wb') as f_ex:
+                f_ex.write(uploaded_ext.getbuffer())
+              cursor.execute(
+                  'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
+                  ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+                  ' VALUES (?, ?, ?, ?, ?, ?)',
+                  (
+                      id_leg_ext,
+                      f'Expediente {exp_ref} - Prórroga de Reposo',
+                      'PDF Prórroga',
+                      str(datetime.today().date()),
+                      ext_path,
+                      nuevo_diagnostico,
+                  ),
+              )
+            conn.commit()
+            conn.close()
+            st.success(
+                '¡Prórroga de reposo registrada y legajo actualizado'
+                ' correctamente!'
+            )
+            st.rerun()
+          else:
+            st.warning('Complete los campos obligatorios (*).')
+    else:
+      st.info('No hay cadetes con reposos activos para extender.')
 
 elif menu == '4. Exámenes Periódicos y Anuales':
   st.markdown(
@@ -1072,10 +1199,30 @@ elif menu == '5. Historia Clínica Integral':
           unsafe_allow_html=True,
       )
       conn = sqlite3.connect(DB_NAME)
+      df_nm_hc = pd.read_sql_query(
+          f"SELECT * FROM notas_medicas WHERE id_legajo = '{id_leg_hc}'", conn
+      )
       df_doc_hc = pd.read_sql_query(
           f"SELECT * FROM legajo_documentos WHERE id_legajo = '{id_leg_hc}'", conn
       )
       conn.close()
+      st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
+      if not df_nm_hc.empty:
+        for _, r in df_nm_hc.iterrows():
+          st.markdown(
+              f'<div class="profile-card" style="border-left: 4px solid'
+              f' #38BDF8;"><h4>Expediente: {r["nro_expediente"]} | Diagnóstico:'
+              f' {r["diagnostico"]}</h4><p><b>Médico:</b> {r["medico"]} |'
+              f' <b>Reposo:</b> {r["tipo_reposo"]} ({r["fecha_desde"]} al'
+              f' {r["fecha_hasta"]})</p><p><b>Certificados e'
+              f' Indicaciones:</b><br>{r["certificados_indicaciones"] if pd.notna(r["certificados_indicaciones"]) else "Sin'
+              f' anexos"}</p><p><b>Análisis y Estudios:</b><br>{r["analisis_estudios"]'
+              ' if pd.notna(r["analisis_estudios"]) else "Sin'
+              ' estudios"}</p></div>',
+              unsafe_allow_html=True,
+          )
+      else:
+        st.write('Sin notas médicas.')
       st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
@@ -1093,7 +1240,10 @@ elif menu == '5. Historia Clínica Integral':
                   key=f"dl_{doc_row['id']}",
               )
       else:
-        st.info('No hay documentos PDF en el legajo digital todavía.')
+        st.info(
+            'No hay documentos PDF generados o anexados en el legajo digital'
+            ' todavía.'
+        )
 
 elif menu == '6. Examen de Baja / Egreso':
   st.markdown(
