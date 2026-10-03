@@ -161,9 +161,9 @@ def importar_excel_directo():
       cargados += 1
     conn.commit()
     conn.close()
-    return True, f'Sincronizados {cargados} cadetes.'
+    return True, f'Se sincronizaron {cargados} cadetes correctamente.'
   except Exception as e:
-    return False, str(e)
+    return False, f'Error al procesar el Excel: {str(e)}'
 
 
 def init_db():
@@ -835,6 +835,7 @@ elif menu == '2. Notas Médicas y Reposos':
         f' | Curso: <b>{cad_sel["curso"]}</b></p></div>',
         unsafe_allow_html=True,
     )
+
     with st.form('form_nota_medica'):
       col1, col2 = st.columns(2)
       with col1:
@@ -857,9 +858,7 @@ elif menu == '2. Notas Médicas y Reposos':
             'Análisis de Laboratorio y Estudios Complementarios'
         )
       medicamentos = st.text_input('Medicamentos Recetados')
-      submitted_nota = st.form_submit_button(
-          'Guardar Nota Médica y Expediente'
-      )
+      submitted_nota = st.form_submit_button('Guardar Nota Médica y Expediente')
 
     uploaded_file = st.file_uploader(
         '📎 Adjuntar Archivo PDF Externo (Certificado / Análisis / Estudio'
@@ -1073,30 +1072,10 @@ elif menu == '5. Historia Clínica Integral':
           unsafe_allow_html=True,
       )
       conn = sqlite3.connect(DB_NAME)
-      df_nm_hc = pd.read_sql_query(
-          f"SELECT * FROM notas_medicas WHERE id_legajo = '{id_leg_hc}'", conn
-      )
       df_doc_hc = pd.read_sql_query(
           f"SELECT * FROM legajo_documentos WHERE id_legajo = '{id_leg_hc}'", conn
       )
       conn.close()
-      st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
-      if not df_nm_hc.empty:
-        for _, r in df_nm_hc.iterrows():
-          st.markdown(
-              f'<div class="profile-card" style="border-left: 4px solid'
-              f' #38BDF8;"><h4>Expediente: {r["nro_expediente"]} | Diagnóstico:'
-              f' {r["diagnostico"]}</h4><p><b>Médico:</b> {r["medico"]} |'
-              f' <b>Reposo:</b> {r["tipo_reposo"]} ({r["fecha_desde"]} al'
-              f' {r["fecha_hasta"]})</p><p><b>Certificados e'
-              f' Indicaciones:</b><br>{r["certificados_indicaciones"] if pd.notna(r["certificados_indicaciones"]) else "Sin'
-              f' anexos"}</p><p><b>Análisis y Estudios:</b><br>{r["analisis_estudios"]'
-              ' if pd.notna(r["analisis_estudios"]) else "Sin'
-              ' estudios"}</p></div>',
-              unsafe_allow_html=True,
-          )
-      else:
-        st.write('Sin notas médicas.')
       st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
@@ -1114,10 +1093,7 @@ elif menu == '5. Historia Clínica Integral':
                   key=f"dl_{doc_row['id']}",
               )
       else:
-        st.info(
-            'No hay documentos PDF generados o anexados en el legajo digital'
-            ' todavía.'
-        )
+        st.info('No hay documentos PDF en el legajo digital todavía.')
 
 elif menu == '6. Examen de Baja / Egreso':
   st.markdown(
