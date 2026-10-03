@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 st.markdown("""<style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
         background-color: #030712;
@@ -92,15 +92,6 @@ st.markdown("""<style>
         border-radius: 0.85rem;
         margin-bottom: 1rem;
         color: #FEF3C7;
-    }
-    .badge-active {
-        background-color: rgba(6, 95, 70, 0.6);
-        color: #34D399;
-        border: 1px solid #059669;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 700;
     }
     .stTextInput input, .stSelectbox select, .stTextArea textarea, .stDateInput input {
         background-color: #111827 !important;
@@ -401,7 +392,7 @@ def generar_pdf_legajo(cad_info, nota_info):
   return pdf_filename
 
 
-st.sidebar.image('https://img.icons8.com/color/96/police-badge.png', width=75)
+st.sidebar.image('[https://img.icons8.com/color/96/police-badge.png](https://img.icons8.com/color/96/police-badge.png)', width=75)
 st.sidebar.markdown('### I.E.S.P. G.J.F.S.M.')
 menu = st.sidebar.radio(
     'Navegación Principal',
@@ -543,7 +534,7 @@ if menu == 'Dashboard General':
         ]
       st.dataframe(df_c_view, use_container_width=True)
   with dash_tab3:
-    st.markdown('### ⚙️ Administración e Institución')
+    st.markdown('### ⚙️️ Administración e Institución')
     if st.button('Sincronizar Base de Cadetes Ahora'):
       exito, msg = importar_excel_directo()
       if exito:
