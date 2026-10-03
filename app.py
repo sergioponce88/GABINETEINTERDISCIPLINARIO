@@ -200,6 +200,7 @@ def init_db():
       ' AUTOINCREMENT, id_legajo TEXT, fecha_baja TEXT, motivo TEXT,'
       ' estado_salud_egreso TEXT, observaciones_medicas TEXT)'
   )
+
   for col, col_type in [
       ('certificados_indicaciones', 'TEXT'),
       ('analisis_estudios', 'TEXT'),
@@ -210,8 +211,10 @@ def init_db():
       cursor.execute(f'ALTER TABLE notas_medicas ADD COLUMN {col} {col_type};')
     except sqlite3.OperationalError:
       pass
+
   conn.commit()
   conn.close()
+
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
   cursor.execute('SELECT COUNT(*) FROM cadetes')
@@ -402,8 +405,13 @@ def generar_pdf_legajo(cad_info, nota_info):
   return pdf_filename
 
 
-st.sidebar.image('[https://img.icons8.com/color/96/police-badge.png](https://img.icons8.com/color/96/police-badge.png)', width=75)
-st.sidebar.markdown('### I.E.S.P. G.J.F.S.M.')
+st.sidebar.markdown('# 🛡️ I.E.S.P. G.J.F.S.M.')
+st.sidebar.markdown(
+    "<small style='color: #94A3B8;'>Dirección de Gabinete Médico</small>",
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown('---')
+
 menu = st.sidebar.radio(
     'Navegación Principal',
     [
@@ -1170,13 +1178,14 @@ elif menu == '5. Historia Clínica Integral':
     )
     df_hc_view = df_cadetes.copy()
     if busq_hc:
+      busq_hc_str = str(busq_hc)
       df_hc_view = df_hc_view[
           df_hc_view['apellido_nombre'].str.contains(
-              busq_hc, case=False, na=False
+              busq_hc_str, case=False, na=False
           )
           | df_hc_view['id_legajo']
           .astype(str)
-          .str.contains(busq_hc, case=False, na=False)
+          .str.contains(busq_hc_str, case=False, na=False)
       ]
     if not df_hc_view.empty:
       lista_hc = (
@@ -1212,57 +1221,64 @@ elif menu == '5. Historia Clínica Integral':
       st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
       if not df_nm_hc.empty:
         for _, r in df_nm_hc.iterrows():
-          st.markdown(
-              '<div class="profile-card" style="border-left: 4px solid'
-              ' #38BDF8;"><h4>Expediente: '
-              + str(r['nro_expediente'])
-              + ' | Diagnóstico: '
-              + str(r['diagnostico'])
-              + '</h4><p><b>Médico:</b> '
-              + str(r['medico'])
-              + ' | <b>Reposo:</b> '
-              + str(r['tipo_reposo'])
-              + ' ('
-              + str(r['fecha_desde'])
-              + ' al '
-              + str(r['fecha_hasta'])
-              + ') | <b>Estado:</b> '
-              + str(r['estado_alta'])
-              + '</p><p><b>Certificados e Indicaciones:</b><br>'
-              + (
-                  str(r['certificados_indicaciones'])
-                  if pd.notna(r['certificados_indicaciones'])
-                  else 'Sin anexos'
-              )
-              + '</p><p><b>Análisis y Estudios:</b><br>'
-              + (
-                  str(r['analisis_estudios'])
-                  if pd.notna(r['analisis_estudios'])
-                  else 'Sin estudios'
-              )
-              + '</p></div>',
-              unsafe_allow_html=True,
+          exp_no = str(r['nro_expediente'])
+          diag = str(r['diagnostico'])
+          med = str(r['medico'])
+          rep = str(r['tipo_reposo'])
+          f_des = str(r['fecha_desde'])
+          f_has = str(r['fecha_hasta'])
+          est = str(r['estado_alta'])
+          cert_ind = (
+              str(r['certificados_indicaciones'])
+              if pd.notna(r['certificados_indicaciones'])
+              else 'Sin anexos'
           )
+          an_est = (
+              str(r['analisis_estudios'])
+              if pd.notna(r['analisis_estudios'])
+              else 'Sin estudios'
+          )
+          card_html = (
+              '<div class="profile-card" style="border-left: 4px solid #38BDF8;">'
+              '<h4>Expediente: '
+              + exp_no
+              + ' | Diagnóstico: '
+              + diag
+              + '</h4><p><b>Médico:</b> '
+              + med
+              + ' | <b>Reposo:</b> '
+              + rep
+              + ' ('
+              + f_des
+              + ' al '
+              + f_has
+              + ') | <b>Estado:</b> '
+              + est
+              + '</p><p><b>Certificados e Indicaciones:</b><br>'
+              + cert_ind
+              + '</p><p><b>Análisis y Estudios:</b><br>'
+              + an_est
+              + '</p></div>'
+          )
+          st.markdown(card_html, unsafe_allow_html=True)
       else:
         st.write('Sin notas médicas.')
       st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
-          st.markdown(
-              '- **'
-              + str(doc_row['titulo_documento'])
-              + '** (Subido el '
-              + str(doc_row['fecha_subida'])
-              + ')'
-          )
-          if os.path.exists(str(doc_row['archivo_nombre'])):
-            with open(str(doc_row['archivo_nombre']), 'rb') as f:
+          t_doc = str(doc_row['titulo_documento'])
+          f_sub = str(doc_row['fecha_subida'])
+          f_path = str(doc_row['archivo_nombre'])
+          doc_id = str(doc_row['id'])
+          st.markdown(f'- **{t_doc}** (Subido el {f_sub})')
+          if os.path.exists(f_path):
+            with open(f_path, 'rb') as f:
               st.download_button(
-                  label='📥 Descargar PDF: ' + str(doc_row['archivo_nombre']),
+                  label=f'📥 Descargar PDF: {f_path}',
                   data=f.read(),
-                  file_name=str(doc_row['archivo_nombre']),
+                  file_name=f_path,
                   mime='application/pdf',
-                  key='dl_' + str(doc_row['id']),
+                  key=f'dl_{doc_id}',
               )
       else:
         st.info('No hay documentos PDF en el legajo digital todavía.')
