@@ -86,18 +86,18 @@ st.markdown(
 )
 
 DB_NAME = "gabinete_iesp.db"
-CSV_FILE = "cadetes.csv"
+EXCEL_FILE = "LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx"
 
 
-def importar_csv_automatico():
-  if not os.path.exists(CSV_FILE):
-    return False, "No se encontró el archivo cadetes.csv en el repositorio."
+def importar_excel_directo():
+  if not os.path.exists(EXCEL_FILE):
+    return False, f"No se encontró el archivo Excel: {EXCEL_FILE}"
   try:
-    df_csv = pd.read_csv(CSV_FILE)
+    df_excel = pd.read_excel(EXCEL_FILE, sheet_name="COMPAÑIA")
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cargados = 0
-    for _, row in df_csv.iterrows():
+    for _, row in df_excel.iterrows():
       if pd.isna(row.get("APELLIDO")) or pd.isna(row.get("NOMBRES")):
         continue
       id_leg = str(row.get("CARGO", row.get("N°", "S/N"))).strip()
@@ -126,12 +126,9 @@ def importar_csv_automatico():
       cargados += 1
     conn.commit()
     conn.close()
-    return (
-        True,
-        f"¡Se sincronizaron {cargados} cadetes correctamente desde CSV!",
-    )
+    return True, f"¡Se sincronizaron {cargados} cadetes correctamente desde Excel!"
   except Exception as e:
-    return False, f"Error al procesar el CSV: {str(e)}"
+    return False, f"Error al procesar el Excel: {str(e)}"
 
 
 def init_db():
@@ -213,7 +210,7 @@ def init_db():
   conn.close()
 
   if count == 0:
-    importar_csv_automatico()
+    importar_excel_directo()
 
 
 init_db()
@@ -299,8 +296,8 @@ if menu == "Dashboard General":
 
   st.markdown("<br>", unsafe_allow_html=True)
   st.markdown("### ⚙️ Herramienta de Sincronización")
-  if st.button("🔄 Sincronizar Cadetes desde CSV"):
-    exito, msg = importar_csv_automatico()
+  if st.button("🔄 Sincronizar Cadetes desde Excel"):
+    exito, msg = importar_excel_directo()
     if exito:
       st.success(msg)
       st.rerun()
@@ -316,7 +313,7 @@ elif menu == "Gestión de Legajos":
 
   with tab1:
     if st.button("🔄 Recargar Base de Cadetes"):
-      ex, ms = importar_csv_automatico()
+      ex, ms = importar_excel_directo()
       if ex:
         st.success(ms)
         st.rerun()
