@@ -24,108 +24,217 @@ st.set_page_config(
 )
 
 st.markdown("""<style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #030712;
-        color: #F3F4F6;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #0B0F19;
-        border-right: 1px solid #1F2937;
-    }
-    [data-testid="stSidebar"] .stRadio label {
-        color: #9CA3AF;
-        font-weight: 500;
-    }
-    .pro-header {
-        background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 100%);
-        padding: 2.5rem;
-        border-radius: 1.25rem;
-        border: 1px solid #312E81;
-        color: white;
-        margin-bottom: 2rem;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-    }
-    .pro-title {
-        font-size: 2.5rem;
-        font-weight: 800;
-        margin: 0;
-        color: #FFFFFF;
-    }
-    .pro-subtitle {
-        font-size: 1.1rem;
-        color: #93C5FD;
-        margin-top: 0.5rem;
-        margin-bottom: 0;
-    }
-    .metric-card {
-        background: #111827;
-        padding: 1.5rem;
-        border-radius: 1rem;
-        border: 1px solid #1F2937;
-        text-align: center;
-    }
-    .metric-value {
-        font-size: 2.3rem;
-        font-weight: 800;
-        color: #38BDF8;
-    }
-    .metric-label {
-        font-size: 0.8rem;
-        color: #9CA3AF;
-        text-transform: uppercase;
-        font-weight: 700;
-        margin-top: 0.35rem;
-    }
-    .profile-card {
-        background: #111827;
-        padding: 1.75rem;
-        border-radius: 1rem;
-        border: 1px solid #1F2937;
-        margin-bottom: 1.5rem;
-    }
-    .alert-card {
-        background: rgba(120, 53, 15, 0.4);
-        border: 1px solid #B45309;
-        padding: 1.25rem;
-        border-radius: 0.85rem;
-        margin-bottom: 1rem;
-        color: #FEF3C7;
-    }
-    .stApp { background-color: #030712; }
-    [data-testid="stHeader"] { background: transparent; }
-    .alert-critical, .alert-warn, .alert-info {
-        padding: 1rem 1.25rem;
-        border-radius: 0.85rem;
-        margin-bottom: 0.75rem;
-        border: 1px solid;
-        border-left-width: 6px;
-    }
-    .alert-critical { background: rgba(127, 29, 29, 0.35); border-color: #EF4444; color: #FEE2E2; }
-    .alert-warn { background: rgba(120, 53, 15, 0.35); border-color: #F59E0B; color: #FEF3C7; }
-    .alert-info { background: rgba(12, 74, 110, 0.35); border-color: #38BDF8; color: #E0F2FE; }
-    .alert-top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
-    .alert-badge { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
-    .alert-meta { font-size: 0.8rem; opacity: 0.75; }
-    .alert-name { font-size: 1.05rem; font-weight: 700; margin-top: 0.25rem; color: #FFFFFF; }
-    .alert-detail { font-size: 0.92rem; margin-top: 0.15rem; opacity: 0.92; }
-    .alert-ok { background: rgba(6, 78, 59, 0.35); border: 1px solid #10B981; color: #D1FAE5; padding: 1.25rem; border-radius: 0.85rem; text-align: center; font-weight: 600; }
-    .stTextInput input, .stSelectbox select, .stTextArea textarea, .stDateInput input {
-        background-color: #111827 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #374151 !important;
-        border-radius: 0.75rem !important;
-    }
-    .stButton>button {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
-        color: white;
-        font-weight: 700;
-        border-radius: 0.75rem;
-        padding: 0.65rem 1.5rem;
-        border: none;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
-    }
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #05070D;
+  --surface: #0C1220;
+  --surface-2: #111A2E;
+  --border: #1C2740;
+  --text: #E6EAF2;
+  --muted: #8A97B1;
+  --accent: #3B82F6;
+  --accent-2: #22D3EE;
+  --ok: #10B981;
+  --warn: #F59E0B;
+  --crit: #EF4444;
+  --info: #38BDF8;
+}
+
+html, body, [class*="css"], .stApp, button, input, textarea, select {
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif !important;
+}
+.stApp {
+  background:
+    radial-gradient(900px 400px at 85% -10%, rgba(59,130,246,0.10), transparent 60%),
+    radial-gradient(700px 380px at -5% 0%, rgba(34,211,238,0.06), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+[data-testid="stHeader"] { background: transparent; }
+#MainMenu, footer, [data-testid="stToolbar"] { visibility: hidden; }
+.block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1400px; }
+
+h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em;
+}
+h3 { font-size: 1.25rem !important; }
+p, li, label, span, div[data-testid="stMarkdownContainer"] { color: inherit; }
+label, .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInput label,
+.stTextArea label, .stNumberInput label {
+  color: var(--muted) !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Sidebar ---------- */
+[data-testid="stSidebar"] {
+  background: linear-gradient(180deg, #0A1020 0%, #070B16 100%);
+  border-right: 1px solid var(--border);
+}
+[data-testid="stSidebar"] > div:first-child { padding-top: 1.2rem; }
+.brand { display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.2rem 1.1rem 0.2rem;
+  border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }
+.brand-logo { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+  font-size: 1.5rem; background: linear-gradient(135deg, #2563EB, #22D3EE);
+  box-shadow: 0 8px 24px rgba(37,99,235,0.45); }
+.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF; letter-spacing: 0.01em; line-height: 1.15; }
+.brand-sub { font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; }
+.nav-label { font-size: 0.68rem; font-weight: 700; color: #5F6C88; text-transform: uppercase;
+  letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }
+.side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px;
+  font-size: 0.74rem; color: var(--muted); background: rgba(17,26,46,0.6); }
+
+[data-testid="stSidebar"] [role="radiogroup"] { gap: 0.2rem; }
+[data-testid="stSidebar"] label[data-baseweb="radio"] {
+  width: 100%; padding: 0.62rem 0.85rem; border-radius: 11px; border: 1px solid transparent;
+  transition: all 0.15s ease; cursor: pointer; margin: 0;
+}
+[data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child { display: none; }
+[data-testid="stSidebar"] label[data-baseweb="radio"] p,
+[data-testid="stSidebar"] label[data-baseweb="radio"] div[data-testid="stMarkdownContainer"] {
+  color: #A9B4CC !important; font-weight: 600; font-size: 0.9rem; text-transform: none; letter-spacing: 0;
+}
+[data-testid="stSidebar"] label[data-baseweb="radio"]:hover { background: rgba(59,130,246,0.08); }
+[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) {
+  background: linear-gradient(90deg, rgba(59,130,246,0.22), rgba(59,130,246,0.05));
+  border-color: rgba(59,130,246,0.35);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) p,
+[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) div[data-testid="stMarkdownContainer"] {
+  color: #FFFFFF !important;
+}
+
+/* ---------- Hero ---------- */
+.hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center;
+  gap: 1.5rem; flex-wrap: wrap; padding: 2rem 2.2rem; border-radius: 22px; margin-bottom: 1.4rem;
+  border: 1px solid #22305A;
+  background:
+    radial-gradient(600px 220px at 100% 0%, rgba(34,211,238,0.18), transparent 65%),
+    radial-gradient(500px 260px at 0% 100%, rgba(99,102,241,0.25), transparent 65%),
+    linear-gradient(135deg, #0B1330 0%, #121B45 100%);
+  box-shadow: 0 24px 50px -20px rgba(0,0,0,0.7); }
+.hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+  background-image: linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 70%); mask-image: linear-gradient(90deg, transparent, #000 70%); }
+.hero > * { position: relative; z-index: 1; }
+.hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-2); }
+.hero-title { font-size: 2rem; font-weight: 800; color: #FFFFFF; margin: 0.25rem 0 0.35rem 0; letter-spacing: -0.02em; line-height: 1.15; }
+.hero-sub { font-size: 0.98rem; color: #A5B4D4; margin: 0; max-width: 640px; }
+.hero-right { text-align: right; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-end; }
+.chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; border-radius: 999px;
+  font-size: 0.76rem; font-weight: 700; border: 1px solid rgba(16,185,129,0.4); color: #6EE7B7; background: rgba(16,185,129,0.1); }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(16,185,129,0.2); }
+.hero-date { font-size: 0.9rem; font-weight: 600; color: #C7D2EE; }
+
+/* ---------- KPI ---------- */
+.kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem;
+  border-radius: 18px; border: 1px solid var(--border);
+  background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%);
+  transition: transform 0.18s ease, border-color 0.18s ease; }
+.kpi:hover { transform: translateY(-3px); border-color: var(--c); }
+.kpi::before { content: ''; position: absolute; left: 0; top: 14%; bottom: 14%; width: 3px; border-radius: 0 4px 4px 0; background: var(--c); }
+.kpi-icon { flex: 0 0 auto; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; font-size: 1.45rem;
+  background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
+.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF; line-height: 1; letter-spacing: -0.02em; }
+.kpi-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.4rem; }
+.kpi-sub { font-size: 0.74rem; color: #64748B; margin-top: 0.15rem; }
+
+/* ---------- Alertas ---------- */
+.al { --c: var(--info); display: flex; gap: 1rem; align-items: flex-start; padding: 1rem 1.2rem; margin-bottom: 0.75rem;
+  border-radius: 16px; border: 1px solid var(--border); position: relative; overflow: hidden;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 10%, #0C1220) 0%, #0C1220 60%);
+  transition: transform 0.15s ease, border-color 0.15s ease; }
+.al:hover { transform: translateX(3px); border-color: color-mix(in srgb, var(--c) 55%, transparent); }
+.al::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+.al-0 { --c: var(--crit); } .al-1 { --c: var(--warn); } .al-2 { --c: var(--info); }
+.al-icon { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 1.2rem;
+  background: color-mix(in srgb, var(--c) 18%, transparent); }
+.al-main { flex: 1 1 auto; min-width: 0; }
+.al-pill { display: inline-block; padding: 0.18rem 0.6rem; border-radius: 999px; font-size: 0.66rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+.al-name { font-size: 1.05rem; font-weight: 700; color: #FFFFFF; margin-top: 0.4rem; }
+.al-detail { font-size: 0.88rem; color: #A9B4CC; margin-top: 0.15rem; line-height: 1.45; }
+.al-meta { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-end; }
+.tag { font-size: 0.72rem; font-weight: 600; color: #B8C3DB; padding: 0.2rem 0.6rem; border-radius: 8px;
+  background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.15); white-space: nowrap; }
+.alert-ok { display: flex; align-items: center; gap: 1rem; padding: 1.4rem 1.5rem; border-radius: 16px;
+  border: 1px solid rgba(16,185,129,0.35); background: linear-gradient(90deg, rgba(16,185,129,0.14), rgba(16,185,129,0.03));
+  color: #A7F3D0; font-weight: 600; }
+.alert-ok .big { font-size: 1.8rem; }
+
+/* ---------- Paneles ---------- */
+.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem;
+  background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }
+.panel-title { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.2rem; }
+.panel-big { font-size: 1.7rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em; }
+.panel-note { font-size: 0.78rem; color: #64748B; margin-top: 0.35rem; }
+.bar { height: 9px; border-radius: 99px; background: #18233D; overflow: hidden; margin-top: 0.7rem; }
+.bar > div { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #2563EB, #22D3EE); }
+.section-head { display: flex; justify-content: space-between; align-items: end; margin: 0.3rem 0 0.9rem 0; }
+.section-head .t { font-size: 1.15rem; font-weight: 800; color: #FFFFFF; }
+.section-head .s { font-size: 0.82rem; color: var(--muted); }
+
+/* ---------- Componentes Streamlit ---------- */
+.stTabs [data-baseweb="tab-list"] { gap: 0.4rem; border-bottom: 1px solid var(--border); }
+.stTabs [data-baseweb="tab"] { height: 46px; padding: 0 1rem; border-radius: 10px 10px 0 0; background: transparent; }
+.stTabs [data-baseweb="tab"] p { color: var(--muted) !important; font-weight: 600; font-size: 0.92rem; }
+.stTabs [data-baseweb="tab"]:hover p { color: #FFFFFF !important; }
+.stTabs [aria-selected="true"] p { color: #FFFFFF !important; }
+.stTabs [data-baseweb="tab-highlight"] { background: linear-gradient(90deg, #3B82F6, #22D3EE) !important; height: 3px; border-radius: 3px; }
+.stTabs [data-baseweb="tab-border"] { background: transparent !important; }
+
+.stTextInput input, .stTextArea textarea, .stDateInput input, .stNumberInput input,
+[data-baseweb="select"] > div, [data-baseweb="input"] {
+  background-color: var(--surface) !important; color: #FFFFFF !important;
+  border: 1px solid var(--border) !important; border-radius: 12px !important;
+}
+.stTextInput input:focus, .stTextArea textarea:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.2) !important; }
+[data-baseweb="tag"] { background: rgba(59,130,246,0.2) !important; border-radius: 8px !important; }
+[data-baseweb="tag"] span { color: #BFDBFE !important; text-transform: none; letter-spacing: 0; font-weight: 600; }
+[data-baseweb="popover"] ul { background: var(--surface-2) !important; }
+
+.stButton > button, .stFormSubmitButton > button {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: #FFFFFF; font-weight: 700; border: none;
+  border-radius: 12px; padding: 0.6rem 1.4rem; box-shadow: 0 6px 18px rgba(37,99,235,0.35); transition: all 0.15s ease; }
+.stButton > button:hover, .stFormSubmitButton > button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(37,99,235,0.5); color: #FFFFFF; }
+.stDownloadButton > button { background: var(--surface-2); color: #DCE4F5; font-weight: 600; border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: none; }
+.stDownloadButton > button:hover { border-color: var(--accent); color: #FFFFFF; background: var(--surface-2); }
+
+[data-testid="stExpander"] { border: 1px solid var(--border) !important; border-radius: 14px !important; background: var(--surface); }
+[data-testid="stExpander"] summary p { color: #DCE4F5 !important; font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 0.9rem; }
+[data-testid="stDataFrame"] { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+[data-testid="stForm"] { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); padding: 1.3rem; }
+[data-testid="stAlert"] { border-radius: 14px; }
+hr { border-color: var(--border) !important; }
+
+/* ---------- Compatibilidad con otras pantallas ---------- */
+.pro-header { background: linear-gradient(135deg, #0B1330 0%, #121B45 100%); padding: 2rem; border-radius: 20px;
+  border: 1px solid #22305A; color: white; margin-bottom: 1.5rem; }
+.pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF; }
+.pro-subtitle { font-size: 1rem; color: #93C5FD; margin-top: 0.4rem; margin-bottom: 0; }
+.metric-card { background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); padding: 1.3rem; border-radius: 16px;
+  border: 1px solid var(--border); text-align: center; }
+.metric-value { font-size: 2.1rem; font-weight: 800; color: #38BDF8; }
+.metric-label { font-size: 0.74rem; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em; margin-top: 0.35rem; }
+.profile-card { background: linear-gradient(135deg, #0F172A 0%, #111B33 100%); padding: 1.5rem 1.75rem; border-radius: 18px;
+  border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; }
+.alert-card { background: rgba(120,53,15,0.35); border: 1px solid #B45309; padding: 1.1rem; border-radius: 14px; margin-bottom: 1rem; color: #FEF3C7; }
+
+@media (max-width: 768px) {
+  .hero { padding: 1.4rem; } .hero-title { font-size: 1.5rem; } .hero-right { align-items: flex-start; text-align: left; }
+  .al { flex-wrap: wrap; } .al-meta { flex-direction: row; align-items: flex-start; }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -440,12 +549,26 @@ def generar_pdf_legajo(cad_info, nota_info):
   return pdf_filename
 
 
-st.sidebar.markdown('# 🛡️ I.E.S.P. G.J.F.S.M.')
 st.sidebar.markdown(
-    "<small style='color: #94A3B8;'>Dirección de Gabinete Médico</small>",
+    '<div class="brand"><div class="brand-logo">🛡️</div><div><div'
+    ' class="brand-name">I.E.S.P. G.J.F.S.M.</div><div class="brand-sub">Dirección'
+    ' de Gabinete Médico</div></div></div><div class="nav-label">Navegación'
+    ' principal</div>',
     unsafe_allow_html=True,
 )
-st.sidebar.markdown('---')
+
+ICONOS_MENU = {
+    'Dashboard General': '📊',
+    'Gestión de Legajos': '📁',
+    'Personal del Gabinete': '🧑‍⚕️',
+    '1. Primera Intervención': '🩺',
+    '2. Notas Médicas y Reposos': '📋',
+    '3. Control de Alta': '✅',
+    '4. Exámenes Periódicos y Anuales': '🧪',
+    '5. Historia Clínica Integral': '🗂️',
+    '6. Examen de Baja / Egreso': '🚪',
+    '7. Informes y Análisis de Datos (Spark)': '📈',
+}
 
 menu = st.sidebar.radio(
     'Navegación Principal',
@@ -461,7 +584,32 @@ menu = st.sidebar.radio(
         '6. Examen de Baja / Egreso',
         '7. Informes y Análisis de Datos (Spark)',
     ],
+    format_func=lambda x: f"{ICONOS_MENU.get(x, '•')}  {x}",
+    label_visibility='collapsed',
 )
+st.sidebar.markdown(
+    '<div class="side-foot">🔒 Información sanitaria confidencial.<br>Uso'
+    ' exclusivo del personal autorizado.</div>',
+    unsafe_allow_html=True,
+)
+
+DIAS_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+            'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+
+def fecha_larga_es(d):
+  return f'{DIAS_ES[d.weekday()]} {d.day} de {MESES_ES[d.month - 1]} de {d.year}'
+
+
+def kpi_card(icono, valor, rotulo, color='#38BDF8', sub=''):
+  sub_html = f'<div class="kpi-sub">{sub}</div>' if sub else ''
+  return (
+      f'<div class="kpi" style="--c: {color};"><div class="kpi-icon">{icono}</div>'
+      f'<div><div class="kpi-value">{valor}</div><div class="kpi-label">{rotulo}</div>'
+      f'{sub_html}</div></div>'
+  )
+
 
 def construir_alertas(df_n, df_e, df_i, hoy):
   """Devuelve una lista de alertas ordenadas por gravedad."""
@@ -544,9 +692,13 @@ def construir_alertas(df_n, df_e, df_i, hoy):
 
 if menu == 'Dashboard General':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">🏥 Centro Médico y'
-      ' Gabinete I.E.S.P.</p><p class="pro-subtitle">Sistema integral de'
-      ' gestión sanitaria, control de guardia y legajos institucionales.</p></div>',
+      '<div class="hero"><div><div class="hero-eyebrow">Panel de control</div>'
+      '<div class="hero-title">Centro Médico y Gabinete I.E.S.P.</div>'
+      '<p class="hero-sub">Sistema integral de gestión sanitaria, control de'
+      ' guardia y legajos institucionales.</p></div><div class="hero-right">'
+      '<div class="chip"><span class="dot"></span>Sistema operativo</div>'
+      f'<div class="hero-date">{fecha_larga_es(datetime.today().date())}</div>'
+      '</div></div>',
       unsafe_allow_html=True,
   )
   df_c = obtener_cadetes()
@@ -569,38 +721,18 @@ if menu == 'Dashboard General':
   )
   conn.close()
 
+  pendientes_alta = (
+      len(df_n[df_n['estado_alta'] == 'Pendiente']) if not df_n.empty else 0
+  )
   col1, col2, col3, col4 = st.columns(4)
   with col1:
-    st.markdown(
-        f'<div class="metric-card"><div'
-        f' class="metric-value">{len(df_c)}</div><div'
-        ' class="metric-label">Cadetes en Compañía</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('🎓', len(df_c), 'Cadetes en compañía', '#38BDF8', 'Total en base de datos'), unsafe_allow_html=True)
   with col2:
-    st.markdown(
-        f'<div class="metric-card"><div'
-        f' class="metric-value">{len(df_i)}</div><div'
-        ' class="metric-label">Intervenciones Guardia</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('🩺', len(df_i), 'Intervenciones de guardia', '#A78BFA', 'Registradas en total'), unsafe_allow_html=True)
   with col3:
-    st.markdown(
-        f'<div class="metric-card"><div'
-        f' class="metric-value">{len(df_p)}</div><div class="metric-label">Staff'
-        ' Gabinete Activo</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('🧑‍⚕️', len(df_p), 'Staff del gabinete', '#34D399', 'Personal activo'), unsafe_allow_html=True)
   with col4:
-    pendientes_alta = (
-        len(df_n[df_n['estado_alta'] == 'Pendiente']) if not df_n.empty else 0
-    )
-    st.markdown(
-        f'<div class="metric-card"><div class="metric-value" style="color:'
-        f' #FBBF24;">{pendientes_alta}</div><div class="metric-label">Altas'
-        ' Pendientes</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('⏳', pendientes_alta, 'Altas pendientes', '#FBBF24', 'Requieren convalidación'), unsafe_allow_html=True)
 
   st.markdown('<br>', unsafe_allow_html=True)
   dash_tab1, dash_tab2, dash_tab3 = st.tabs([
@@ -618,18 +750,12 @@ if menu == 'Dashboard General':
     n_info = sum(1 for a in alertas if a['nivel'] == 2)
 
     k1, k2, k3 = st.columns(3)
-    for col, valor, rotulo, color in [
-        (k1, n_crit, 'Críticas', '#EF4444'),
-        (k2, n_warn, 'Requieren atención', '#F59E0B'),
-        (k3, n_info, 'Informativas (reposos vigentes)', '#38BDF8'),
-    ]:
-      with col:
-        st.markdown(
-            f'<div class="metric-card"><div class="metric-value"'
-            f' style="color: {color};">{valor}</div><div'
-            f' class="metric-label">{rotulo}</div></div>',
-            unsafe_allow_html=True,
-        )
+    with k1:
+      st.markdown(kpi_card('🚨', n_crit, 'Alertas críticas', '#EF4444', 'Acción inmediata'), unsafe_allow_html=True)
+    with k2:
+      st.markdown(kpi_card('⚠️', n_warn, 'Requieren atención', '#F59E0B', 'Seguimiento próximo'), unsafe_allow_html=True)
+    with k3:
+      st.markdown(kpi_card('🛌', n_info, 'Reposos vigentes', '#38BDF8', 'Informativo'), unsafe_allow_html=True)
     st.markdown('<br>', unsafe_allow_html=True)
 
     f1, f2 = st.columns([2, 1])
@@ -650,50 +776,91 @@ if menu == 'Dashboard General':
         if a['nivel'] in permitidos
         and (curso_sel == 'Todos' or a['curso'] == curso_sel)
     ]
+    iconos_nivel = {0: '🚨', 1: '⏰', 2: '🛌'}
+    etiquetas_nivel = {0: 'Crítica', 1: 'Atención', 2: 'Informativa'}
 
-    estilos = {
-        0: ('alert-critical', '🔴'),
-        1: ('alert-warn', '🟠'),
-        2: ('alert-info', '🔵'),
-    }
-    if not visibles:
-      st.markdown(
-          '<div class="alert-ok">✅ Sin alertas para los filtros'
-          ' seleccionados. Todo en orden.</div>',
-          unsafe_allow_html=True,
-      )
-    else:
-      for a in visibles[:60]:
-        clase, icono = estilos[a['nivel']]
-        st.markdown(
-            f'<div class="{clase}"><div class="alert-top"><span'
-            f' class="alert-badge">{icono} {_esc(a["tipo"])}</span><span'
-            f' class="alert-meta">Curso {_esc(a["curso"])} · Legajo'
-            f' {_esc(a["legajo"])}</span></div><div'
-            f' class="alert-name">{_esc(a["cadete"])}</div><div'
-            f' class="alert-detail">{_esc(a["detalle"])}</div></div>',
-            unsafe_allow_html=True,
-        )
-      if len(visibles) > 60:
-        st.caption(f'Mostrando 60 de {len(visibles)} alertas. Filtre por curso para ver el resto.')
-      df_alertas = pd.DataFrame(visibles).drop(columns=['nivel', 'orden'])
-      df_alertas.columns = ['Cadete', 'Curso', 'Legajo', 'Tipo', 'Detalle']
-      st.download_button(
-          '⬇️ Descargar alertas (CSV)',
-          df_alertas.to_csv(index=False).encode('utf-8-sig'),
-          file_name=f'alertas_{hoy}.csv',
-          mime='text/csv',
-      )
-
-    # Cadetes sin examen periódico del año en curso
+    # Cobertura de exámenes periódicos del año
     anio_actual = str(hoy.year)
     con_examen = (
         set(df_e.loc[df_e['anio'].astype(str) == anio_actual, 'id_legajo'].astype(str))
         if not df_e.empty
         else set()
     )
+    ids_cadetes = set(df_c['id_legajo'].astype(str))
+    con_examen &= ids_cadetes
+    pct_cob = round(100 * len(con_examen) / len(ids_cadetes)) if ids_cadetes else 0
+
+    col_izq, col_der = st.columns([2.1, 1], gap='large')
+    with col_izq:
+      st.markdown(
+          '<div class="section-head"><div><div class="t">Centro de alertas</div>'
+          f'<div class="s">{len(visibles)} alerta(s) según los filtros'
+          ' seleccionados</div></div></div>',
+          unsafe_allow_html=True,
+      )
+      if not visibles:
+        st.markdown(
+            '<div class="alert-ok"><span class="big">✅</span><div>Sin alertas'
+            ' para los filtros seleccionados.<br><span style="font-weight:400;'
+            ' opacity:.8;">Todo en orden.</span></div></div>',
+            unsafe_allow_html=True,
+        )
+      else:
+        for a in visibles[:60]:
+          st.markdown(
+              f'<div class="al al-{a["nivel"]}"><div'
+              f' class="al-icon">{iconos_nivel[a["nivel"]]}</div><div'
+              f' class="al-main"><span'
+              f' class="al-pill">{etiquetas_nivel[a["nivel"]]} ·'
+              f' {_esc(a["tipo"])}</span><div'
+              f' class="al-name">{_esc(a["cadete"])}</div><div'
+              f' class="al-detail">{_esc(a["detalle"])}</div></div><div'
+              f' class="al-meta"><span class="tag">Curso'
+              f' {_esc(a["curso"])}</span><span class="tag">Legajo'
+              f' {_esc(a["legajo"])}</span></div></div>',
+              unsafe_allow_html=True,
+          )
+        if len(visibles) > 60:
+          st.caption(f'Mostrando 60 de {len(visibles)} alertas. Filtre por curso para ver el resto.')
+        df_alertas = pd.DataFrame(visibles).drop(columns=['nivel', 'orden'])
+        df_alertas.columns = ['Cadete', 'Curso', 'Legajo', 'Tipo', 'Detalle']
+        st.download_button(
+            '⬇️ Descargar alertas (CSV)',
+            df_alertas.to_csv(index=False).encode('utf-8-sig'),
+            file_name=f'alertas_{hoy}.csv',
+            mime='text/csv',
+        )
+
+    with col_der:
+      # Actividad de guardia: últimos 14 días
+      dias_idx = pd.date_range(end=pd.Timestamp(hoy), periods=14)
+      conteo = {}
+      if not df_i.empty:
+        fechas = pd.to_datetime(df_i['fecha_hora'], errors='coerce').dt.normalize().dropna()
+        conteo = fechas.value_counts().to_dict()
+      serie = pd.DataFrame(
+          {'Intervenciones': [int(conteo.get(d, 0)) for d in dias_idx]},
+          index=dias_idx,
+      )
+      st.markdown(
+          '<div class="panel"><div class="panel-title">Actividad de guardia</div>'
+          f'<div class="panel-big">{int(serie["Intervenciones"].sum())}</div>'
+          '<div class="panel-note">intervenciones en los últimos 14 días</div></div>',
+          unsafe_allow_html=True,
+      )
+      st.bar_chart(serie, color='#38BDF8', height=190)
+
+      st.markdown(
+          '<div class="panel"><div class="panel-title">Exámenes periódicos'
+          f' {anio_actual}</div><div class="panel-big">{pct_cob}%</div>'
+          f'<div class="bar"><div style="width: {pct_cob}%;"></div></div>'
+          f'<div class="panel-note">{len(con_examen)} de {len(ids_cadetes)}'
+          ' cadetes con examen registrado</div></div>',
+          unsafe_allow_html=True,
+      )
+
     df_sin = df_c[~df_c['id_legajo'].astype(str).isin(con_examen)]
-    with st.expander(f'📋 Sin examen periódico {anio_actual}: {len(df_sin)} de {len(df_c)} cadetes'):
+    with st.expander(f'📋 Cadetes sin examen periódico {anio_actual} ({len(df_sin)})'):
       st.dataframe(df_sin[['id_legajo', 'apellido_nombre', 'curso']], use_container_width=True)
   with dash_tab2:
     st.markdown('### 👥 Consulta Rápida de Compañía de Cadetes')
