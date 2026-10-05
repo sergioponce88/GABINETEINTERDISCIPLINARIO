@@ -372,7 +372,7 @@ def init_db():
     except sqlite3.OperationalError:
       pass
 
-  # Migración: asegurar columnas en primera_intervencion (incluyendo temperatura)
+  # Migración: asegurar columnas en primera_intervencion
   for col, col_type in [
       ('id_legajo', 'TEXT'),
       ('fecha_hora', 'TEXT'),
@@ -388,7 +388,7 @@ def init_db():
           f'ALTER TABLE primera_intervencion ADD COLUMN {col} {col_type};'
       )
     except sqlite3.OperationalError:
-      pass  # la columna ya existe
+      pass
 
   conn.commit()
   conn.close()
@@ -618,7 +618,7 @@ _logo_gab = logo_uri('GABINETE.png', 116)
 _brand_logo = (
     f'<div class="brand-logo has-img"><img src="{_logo_gab}" alt="Gabinete"></div>'
     if _logo_gab
-    else '<div class="brand-logo">🛡️</div>'
+    else '<div class="brand-logo">🛡️️</div>'
 )
 st.sidebar.markdown(
     f'<div class="brand">{_brand_logo}<div><div'
@@ -1227,10 +1227,9 @@ elif menu == '1. Primera Intervención':
     with st.form('form_intervencion'):
       col1, col2 = st.columns(2)
       with col1:
-        fecha_hora = st.text_input(
-            'Fecha y Hora',
-            value=str(datetime.now().strftime('%Y-%m-%d %H:%M')),
-        )
+        # Hora actual exacta de Argentina (UTC-3)
+        hora_arg = (datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
+        fecha_hora = st.text_input('Fecha y Hora', value=hora_arg)
         profesional_atiende = st.selectbox(
             'Profesional que Atiende*', lista_profesionales
         )
@@ -1597,7 +1596,7 @@ elif menu == '3. Control de Alta':
           else:
             st.warning('Complete campos obligatorios (*).')
     else:
-      st.info('No hay reposos activos para extender.')
+      st.info('No hay cadetes con reposos activos para extender.')
 
 elif menu == '4. Exámenes Periódicos y Anuales':
   st.markdown(
