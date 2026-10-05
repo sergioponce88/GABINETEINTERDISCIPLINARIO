@@ -1099,65 +1099,75 @@ elif menu == 'Gestión de Legajos':
 
 elif menu == 'Personal del Gabinete':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">👥 Staff Médico y Personal del'
-      ' Gabinete</h2>',
+      '<div class="pro-header"><p class="pro-title">👥 Staff Médico y Personal del Gabinete</p><p class="pro-subtitle">Directorio institucional de profesionales, matrículas y gestión de altas/bajas.</p></div>',
       unsafe_allow_html=True,
   )
+  
+  df_p_gen = obtener_personal()
+  if not df_p_gen.empty:
+    cp1, cp2, cp3 = st.columns(3)
+    with cp1:
+      st.markdown(kpi_card('🧑‍⚕️️', len(df_p_gen), 'Total staff activo', '#38BDF8'), unsafe_allow_html=True)
+    with cp2:
+      medicos_count = len(df_p_gen[df_p_gen['especialidad'].str.contains('Médico', case=False, na=False)])
+      st.markdown(kpi_card('🩺', medicos_count, 'Médicos / Clínicos', '#34D399'), unsafe_allow_html=True)
+    with cp3:
+      psi_count = len(df_p_gen[df_p_gen['especialidad'].str.contains('Psicó|Psiquiatra|Psicopedagogo', case=False, na=False)])
+      st.markdown(kpi_card('🧠', psi_count, 'Salud Mental / Psico', '#A78BFA'), unsafe_allow_html=True)
+  
+  st.markdown('<br>', unsafe_allow_html=True)
   tab_p1, tab_p2 = st.tabs(['📋 Listado de Staff', '➕ Alta / Baja de Personal'])
+  
   with tab_p1:
+    st.markdown('<br>', unsafe_allow_html=True)
     df_personal = obtener_personal()
     if not df_personal.empty:
+      st.markdown('<div class="panel">', unsafe_allow_html=True)
       st.dataframe(df_personal, use_container_width=True)
+      st.markdown('</div>', unsafe_allow_html=True)
     else:
       st.info('No hay personal del gabinete registrado todavía.')
+      
   with tab_p2:
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Registro de Nuevo Profesional</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese la información requerida y la matrícula oficial del profesional.</p></div>', unsafe_allow_html=True)
+    
     with st.form('form_personal'):
-      col1, col2 = st.columns(2)
+      col1, col2 = st.columns(2, gap='medium')
       with col1:
-        leg_pers = st.text_input('Número de Legajo / ID Personal*').strip()
-        ap_nom_pers = st.text_input('Apellido y Nombres*').strip()
-        dni_pers = st.text_input('DNI').strip()
+        leg_pers = st.text_input('Número de Legajo / ID Personal *', placeholder='Ej: P-4521').strip()
+        ap_nom_pers = st.text_input('Apellido y Nombres *', placeholder='Ej: LÓPEZ, AGOSTINA').strip()
+        dni_pers = st.text_input('DNI', placeholder='Ej: 32132121').strip()
       with col2:
-        mat_pers = st.text_input('Matrícula Profesional*').strip()
-        esp_pers = st.selectbox(
-            'Especialidad',
-            [
-                'Médico/a Clínico/a',
-                'Psicólogo/a',
-                'Psicopedagogo/a',
-                'Psiquiatra',
-                'Enfermero/a',
-                'Administrativo/a',
-                'Otro',
-            ],
-        )
-        tel_pers = st.text_input('Teléfono de Contacto').strip()
-      if st.form_submit_button('Registrar Profesional'):
+        mat_pers = st.text_input('Matrícula Profesional *', placeholder='Ej: MP-12312').strip()
+        esp_pers = st.selectbox('Especialidad', [
+            'Médico/a Clínico/a', 'Psicólogo/a', 'Psicopedagogo/a',
+            'Psiquiatra', 'Enfermero/a', 'Administrativo/a', 'Otro'
+        ])
+        tel_pers = st.text_input('Teléfono de Contacto', placeholder='Ej: 3816545454').strip()
+        
+      st.markdown('<br>', unsafe_allow_html=True)
+      if st.form_submit_button('💾 Registrar Profesional en Staff'):
         if leg_pers and ap_nom_pers and mat_pers:
           try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             cursor.execute(
                 'INSERT INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)',
-                (
-                    leg_pers,
-                    ap_nom_pers,
-                    dni_pers,
-                    mat_pers,
-                    esp_pers,
-                    tel_pers,
-                ),
+                (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers),
             )
             conn.commit()
             conn.close()
             st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
             st.rerun()
           except sqlite3.IntegrityError:
-            st.error('Error: El número de legajo ya existe.')
+            st.error('Error: El número de legajo de personal ya existe.')
         else:
           st.warning('Complete los campos obligatorios (*).')
-    st.markdown('---')
-    st.markdown('### 🗑️ Baja de Personal')
+          
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Baja de Personal</h3><p style="color: var(--muted); font-size: 0.88rem;">Seleccione el profesional que dejará de formar parte del staff activo del gabinete.</p></div>', unsafe_allow_html=True)
+    
     df_pers_del = obtener_personal()
     if not df_pers_del.empty:
       lista_del = (
@@ -1168,21 +1178,18 @@ elif menu == 'Personal del Gabinete':
           + df_pers_del['especialidad']
           + ')'
       ).tolist()
-      sel_del = st.selectbox(
-          'Seleccione el Profesional a Dar de Baja', lista_del
-      )
-      if st.button('Confirmar Baja'):
-        id_elim = sel_del.split(' - ')[0]
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            'DELETE FROM personal_gabinete WHERE id_legajo_personal = ?',
-            (id_elim,),
-        )
-        conn.commit()
-        conn.close()
-        st.success('¡Personal dado de baja!')
-        st.rerun()
+      with st.form('form_baja_personal'):
+        sel_del = st.selectbox('Seleccione el Profesional', lista_del)
+        st.markdown('<br>', unsafe_allow_html=True)
+        if st.form_submit_button('🗑️ Confirmar Baja del Staff'):
+          id_elim = sel_del.split(' - ')[0]
+          conn = sqlite3.connect(DB_NAME)
+          cursor = conn.cursor()
+          cursor.execute('DELETE FROM personal_gabinete WHERE id_legajo_personal = ?', (id_elim,))
+          conn.commit()
+          conn.close()
+          st.success('¡Personal dado de baja correctamente!')
+          st.rerun()
 
 elif menu == '1. Primera Intervención':
   st.markdown(
