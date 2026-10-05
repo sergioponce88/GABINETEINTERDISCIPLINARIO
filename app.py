@@ -1151,15 +1151,28 @@ elif menu == 'Personal del Gabinete':
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             cursor.execute(
-                'INSERT INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)',
+                'INSERT OR REPLACE INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)',
                 (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers),
             )
             conn.commit()
             conn.close()
             st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
             st.rerun()
-          except sqlite3.IntegrityError:
-            st.error('Error: El número de legajo de personal ya existe.')
+          except sqlite3.OperationalError as e:
+            st.error(f'Error de base de datos: {e}')
+            # Auto-migración por si la tabla personal_gabinete carece de alguna columna
+            try:
+              cursor.execute('CREATE TABLE IF NOT EXISTS personal_gabinete (id_legajo_personal TEXT PRIMARY KEY, apellido_nombre TEXT NOT NULL, dni TEXT, matricula TEXT, especialidad TEXT, telefono TEXT)')
+              for col, col_t in [('id_legajo_personal', 'TEXT PRIMARY KEY'), ('apellido_nombre', 'TEXT'), ('dni', 'TEXT'), ('matricula', 'TEXT'), ('especialidad', 'TEXT'), ('telefono', 'TEXT')]:
+                try: cursor.execute(f'ALTER TABLE personal_gabinete ADD COLUMN {col} {col_t};')
+                except Exception: pass
+              cursor.execute('INSERT OR REPLACE INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)', (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers))
+              conn.commit()
+              conn.close()
+              st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
+              st.rerun()
+            except Exception as ex:
+              st.error(f'Error crítico al guardar: {ex}')
         else:
           st.warning('Complete los campos obligatorios (*).')
           
@@ -1225,10 +1238,8 @@ elif menu == '1. Primera Intervención':
     with st.form('form_intervencion'):
       col1, col2 = st.columns(2)
       with col1:
-        fecha_hora = st.text_input(
-            'Fecha y Hora',
-            value=str((datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')),
-        )
+        hora_arg = (datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
+        fecha_hora = st.text_input('Fecha y Hora', value=hora_arg)
         profesional_atiende = st.selectbox(
             'Profesional que Atiende*', lista_profesionales
         )
