@@ -618,7 +618,7 @@ _logo_gab = logo_uri('GABINETE.png', 116)
 _brand_logo = (
     f'<div class="brand-logo has-img"><img src="{_logo_gab}" alt="Gabinete"></div>'
     if _logo_gab
-    else '<div class="brand-logo">🛡️</div>'
+    else '<div class="brand-logo">🛡️️</div>'
 )
 st.sidebar.markdown(
     f'<div class="brand">{_brand_logo}<div><div'
@@ -998,47 +998,81 @@ if menu == 'Dashboard General':
 
 elif menu == 'Gestión de Legajos':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">📁 Gestión de Legajos de Cadetes</h2>',
+      '<div class="pro-header"><p class="pro-title">📁 Gestión de Legajos de Cadetes</p><p class="pro-subtitle">Directorio institucional de compañía, altas manuales y control de legajos sanitarios.</p></div>',
       unsafe_allow_html=True,
   )
-  tab1, tab2 = st.tabs(['🔍 Consultar / Listar Compañía', '➕ Registrar Nuevo'])
+  
+  df_c_gen = obtener_cadetes()
+  if not df_c_gen.empty:
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+      st.markdown(kpi_card('👥', len(df_c_gen), 'Total compañía', '#38BDF8'), unsafe_allow_html=True)
+    with c2:
+      c_1 = len(df_c_gen[df_c_gen['curso'].str.contains('1', na=False)])
+      st.markdown(kpi_card('1️⃣', c_1, 'Primer año', '#34D399'), unsafe_allow_html=True)
+    with c3:
+      c_2 = len(df_c_gen[df_c_gen['curso'].str.contains('2', na=False)])
+      st.markdown(kpi_card('2️⃣', c_2, 'Segundo año', '#FBBF24'), unsafe_allow_html=True)
+    with c4:
+      c_3 = len(df_c_gen[df_c_gen['curso'].str.contains('3', na=False)])
+      st.markdown(kpi_card('3️⃣', c_3, 'Tercer año', '#A78BFA'), unsafe_allow_html=True)
+  
+  st.markdown('<br>', unsafe_allow_html=True)
+  tab1, tab2 = st.tabs(['🔍 Consultar / Listar Compañía', '➕ Registrar Nuevo Cadete'])
+  
   with tab1:
-    if st.button('🔄 Recargar Base'):
-      ex, ms = importar_excel_directo()
-      if ex:
-        st.success(ms)
-        st.rerun()
+    st.markdown('<br>', unsafe_allow_html=True)
+    col_t1, col_t2 = st.columns([3, 1])
+    with col_t1:
+      busqueda = st.text_input('🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo/Cargo', placeholder='Escriba para filtrar...')
+    with col_t2:
+      st.markdown('<div style="margin-top: 1.8rem;"></div>', unsafe_allow_html=True)
+      if st.button('🔄 Sincronizar con Excel'):
+        ex, ms = importar_excel_directo()
+        if ex: st.success(ms); st.rerun()
+        else: st.error(ms)
+        
     df_cadetes = obtener_cadetes()
     if not df_cadetes.empty:
-      busqueda = st.text_input(
-          '🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo/Cargo'
-      )
       if busqueda:
         df_cadetes = df_cadetes[
-            df_cadetes['apellido_nombre']
-            .str.contains(busqueda, case=False, na=False)
-            | df_cadetes['id_legajo']
-            .astype(str)
-            .str.contains(busqueda, case=False, na=False)
+            df_cadetes['apellido_nombre'].str.contains(busqueda, case=False, na=False)
+            | df_cadetes['id_legajo'].astype(str).str.contains(busqueda, case=False, na=False)
+            | df_cadetes['dni'].astype(str).str.contains(busqueda, case=False, na=False)
         ]
-      st.dataframe(df_cadetes, use_container_width=True)
+      
+      st.markdown('<div class="panel">', unsafe_allow_html=True)
+      st.dataframe(df_cadetes, use_container_width=True, height=450)
+      st.markdown('</div>', unsafe_allow_html=True)
+      
+      st.download_button(
+          '⬇️ Descargar listado completo (CSV)',
+          df_cadetes.to_csv(index=False).encode('utf-8-sig'),
+          file_name=f'cadetes_iesp_{datetime.today().date()}.csv',
+          mime='text/csv',
+      )
     else:
-      st.warning('No hay cadetes en la base.')
+      st.warning('No hay cadetes en la base de datos.')
+      
   with tab2:
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Formulario de Alta Manual de Cadete</h3><p style="color: var(--muted); font-size: 0.88rem;">Complete los datos obligatorios para incorporar un nuevo legajo al sistema institucional.</p></div>', unsafe_allow_html=True)
+    
     with st.form('form_nuevo_cadete'):
-      col1, col2 = st.columns(2)
+      col1, col2 = st.columns(2, gap='medium')
       with col1:
-        id_legajo = st.text_input('Número de Legajo / Cargo*').strip()
-        apellido_nombre = st.text_input('Apellido y Nombres*').strip()
-        curso = st.selectbox('Curso', ['1 AÑO', '2 AÑO', '3 AÑO'])
+        id_legajo = st.text_input('Número de Legajo / Cargo *', placeholder='Ej: 20505').strip()
+        apellido_nombre = st.text_input('Apellido y Nombres *', placeholder='Ej: PÉREZ, JUAN CARLOS').strip()
+        curso = st.selectbox('Curso / Año', ['1 AÑO', '2 AÑO', '3 AÑO'])
       with col2:
-        dni = st.text_input('DNI')
+        dni = st.text_input('Documento Nacional de Identidad (DNI)', placeholder='Ej: 42356789').strip()
         genero = st.selectbox('Género', ['Masculino', 'Femenino', 'Otro'])
-        fecha_nacimiento = st.date_input(
-            'Fecha de Nacimiento', value=date(2000, 1, 1)
-        )
-      observaciones = st.text_area('Observaciones / Contacto / Antecedentes')
-      if st.form_submit_button('Guardar Legajo'):
+        fecha_nacimiento = st.date_input('Fecha de Nacimiento', value=date(2002, 1, 1))
+        
+      observaciones = st.text_area('Observaciones / Contacto / Antecedentes Sanitarios', placeholder='Email, celular, grupo sanguíneo, etc.')
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      if st.form_submit_button('💾 Guardar Legajo Institucional'):
         if id_legajo and apellido_nombre:
           try:
             conn = sqlite3.connect(DB_NAME)
@@ -1057,12 +1091,11 @@ elif menu == 'Gestión de Legajos':
             )
             conn.commit()
             conn.close()
-            st.success(f'¡Legajo {id_legajo} guardado con éxito!')
-            st.rerun()
+            st.success(f'¡Legajo {id_legajo} de {apellido_nombre} guardado con éxito!')
           except sqlite3.IntegrityError:
-            st.error('Error: El número de legajo ya existe.')
+            st.error('Error: El número de legajo ya existe en la base de datos.')
         else:
-          st.warning('Complete Legajo y Apellido y Nombres.')
+          st.warning('Debe completar obligatoriamente el Número de Legajo y los Apellidos y Nombres.')
 
 elif menu == 'Personal del Gabinete':
   st.markdown(
@@ -1555,7 +1588,7 @@ elif menu == '3. Control de Alta':
           else:
             st.warning('Complete campos obligatorios (*).')
     else:
-      st.info('No hay cadetes con reposos activos para extender.')
+      st.info('No hay reposos activos para extender.')
 
 elif menu == '4. Exámenes Periódicos y Anuales':
   st.markdown(
