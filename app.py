@@ -618,7 +618,7 @@ _logo_gab = logo_uri('GABINETE.png', 116)
 _brand_logo = (
     f'<div class="brand-logo has-img"><img src="{_logo_gab}" alt="Gabinete"></div>'
     if _logo_gab
-    else '<div class="brand-logo">🛡️️</div>'
+    else '<div class="brand-logo">🛡️</div>'
 )
 st.sidebar.markdown(
     f'<div class="brand">{_brand_logo}<div><div'
@@ -1042,7 +1042,7 @@ elif menu == 'Gestión de Legajos':
         ]
       
       st.markdown('<div class="panel">', unsafe_allow_html=True)
-      st.dataframe(df_cadetes, use_container_width=True, height=450)
+      st.dataframe(df_cadetes, use_container_width=True)
       st.markdown('</div>', unsafe_allow_html=True)
       
       st.download_button(
