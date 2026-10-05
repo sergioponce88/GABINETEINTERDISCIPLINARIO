@@ -1377,3 +1377,529 @@ elif menu == '2. Notas Médicas y Reposos':
                 tipo_reposo,
                 str(fecha_desde),
                 str(fecha_hasta),
+                medicamentos,
+                certificados_indicaciones,
+                analisis_estudios,
+            ),
+        )
+        conn.commit()
+        nota_dict = {
+            'nro_expediente': nro_expediente,
+            'medico': medico,
+            'diagnostico': diagnostico,
+            'tipo_reposo': tipo_reposo,
+            'fecha_desde': str(fecha_desde),
+            'fecha_hasta': str(fecha_hasta),
+            'medicamentos': medicamentos,
+            'certificados_indicaciones': certificados_indicaciones,
+            'analisis_estudios': analisis_estudios,
+        }
+        pdf_path = generar_pdf_legajo(cad_sel, nota_dict)
+        cursor.execute(
+            'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
+            ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+            ' VALUES (?, ?, ?, ?, ?, ?)',
+            (
+                id_legajo,
+                f'Expediente {nro_expediente} - Nota Médica y Certificado',
+                'PDF Oficial',
+                str(datetime.today().date()),
+                pdf_path,
+                'Generado automáticamente',
+            ),
+        )
+        if uploaded_file is not None:
+          ext_path = os.path.join(
+              UPLOAD_DIR, f'{id_legajo}_{nro_expediente}_{uploaded_file.name}'
+          )
+          with open(ext_path, 'wb') as f_ext:
+            f_ext.write(uploaded_file.getbuffer())
+          cursor.execute(
+              'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
+              ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+              ' VALUES (?, ?, ?, ?, ?, ?)',
+              (
+                  id_legajo,
+                  f'Expediente {nro_expediente} - Archivo Externo Adjunto',
+                  'PDF Externo',
+                  str(datetime.today().date()),
+                  ext_path,
+                  'Subido por usuario',
+              ),
+          )
+        conn.commit()
+        conn.close()
+        st.success(
+            '¡Nota médica y documentación PDF anexadas con éxito al legajo'
+            ' digital!'
+        )
+      else:
+        st.warning('Complete los campos obligatorios (*).')
+
+elif menu == '3. Control de Alta':
+  st.markdown(
+      '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide el alta médica reglamentaria adjuntando el certificado oficial o registre extensiones de reposo.</p></div>',
+      unsafe_allow_html=True,
+  )
+
+  conn = sqlite3.connect(DB_NAME)
+  df_pendientes = pd.read_sql_query(
+      "SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN"
+      " cadetes c ON n.id_legajo = c.id_legajo WHERE n.estado_alta = 'Pendiente'",
+      conn,
+  )
+  conn.close()
+
+  alta_tab1, alta_tab2 = st.tabs([
+      '1️⃣ Convalidar Alta Médica y Adjuntar Certificado',
+      '2️⃣ Extensión de Reposo / Prórroga',
+  ])
+
+  with alta_tab1:
+    st.markdown('<br>', unsafe_allow_html=True)
+    if not df_pendientes.empty:
+      st.markdown('<div class="panel"><h3>Expedientes con Reposo Pendiente de Alta</h3></div>', unsafe_allow_html=True)
+      st.dataframe(
+          df_pendientes[[
+              'id',
+              'nro_expediente',
+              'id_legajo',
+              'apellido_nombre',
+              'curso',
+              'medico',
+              'tipo_reposo',
+              'fecha_hasta',
+          ]],
+          use_container_width=True,
+      )
+      
+      cadetes_alta_lista = (df_pendientes['id'].astype(str) + " - " + df_pendientes['apellido_nombre'] + " (Exp: " + df_pendientes['nro_expediente'] + ")").tolist()
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      st.markdown('<div class="panel"><h3>Formulario Oficial de Alta Médica</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese los datos del médico otorgante y adjunte el certificado PDF correspondiente.</p></div>', unsafe_allow_html=True)
+      
+      sel_alta_form = st.selectbox('Seleccione el Expediente para Convalidar Alta', cadetes_alta_lista, key='sel_alta_form_unique')
+      exp_id = int(sel_alta_form.split(' - ')[0])
+      exp_row = df_pendientes[df_pendientes['id'] == exp_id].iloc[0]
+      
+      with st.form('form_convalidar_alta'):
+        col_a1, col_a2 = st.columns(2, gap='medium')
+        with col_a1:
+          medico_alta = st.text_input('Médico Tratante / Matrícula que otorga el Alta *', placeholder='Ej: Dr. Gómez / MP-4521').strip()
+          fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=datetime.today().date())
+        with col_a2:
+          observaciones_alta = st.text_area('Observaciones Clínicas de Alta / Aptitud', placeholder='Paciente recuperado, sin secuelas, apto para retomar actividades.')
+        
+        uploaded_alta_pdf = st.file_uploader('📎 Adjuntar Certificado de Alta Médico (PDF)', type=['pdf'], key='up_alta_pdf')
+        
+        st.markdown('<br>', unsafe_allow_html=True)
+        if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Archivar'):
+          if medico_alta:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id = ?", (exp_id,))
+            
+            if uploaded_alta_pdf is not None:
+              alta_path = os.path.join(UPLOAD_DIR, f"{exp_row['id_legajo']}_ALTA_{exp_row['nro_expediente']}_{uploaded_alta_pdf.name}")
+              with open(alta_path, 'wb') as f_al:
+                f_al.write(uploaded_alta_pdf.getbuffer())
+              cursor.execute('INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
+                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta Médica", 'PDF Alta', str(datetime.today().date()), alta_path, f"Médico: {medico_alta} | {observaciones_alta}"))
+            
+            conn.commit()
+            conn.close()
+            st.success('¡Alta médica convalidada y certificado PDF archivado con éxito en el legajo!')
+            st.rerun()
+          else:
+            st.warning('Debe completar el nombre o matrícula del médico que otorga el alta.')
+    else:
+      st.info('ℹ️ No hay expedientes pendientes de alta médica.')
+
+  with alta_tab2:
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('### Registro de Prórroga o Más Días de Reposo')
+    st.markdown(
+        "<p style='color: #94A3B8;'>Si el cadete presenta un nuevo certificado"
+        ' médico extendiendo sus días de reposo o un nuevo parte, registre aquí'
+        ' la ampliación del expediente.</p>',
+        unsafe_allow_html=True,
+    )
+    if not df_pendientes.empty:
+      cadetes_pendientes_lista = (
+          df_pendientes['id_legajo'].astype(str)
+          + ' - '
+          + df_pendientes['apellido_nombre']
+          + ' (Exp: '
+          + df_pendientes['nro_expediente']
+          + ')'
+      ).tolist()
+      sel_ext = st.selectbox(
+          'Seleccione Expediente / Cadete para Extender Reposo',
+          cadetes_pendientes_lista,
+      )
+      id_leg_ext = sel_ext.split(' - ')[0]
+      exp_ref = sel_ext.split('Exp: ')[1].split(')')[0]
+
+      with st.form('form_extension_reposo'):
+        col_e1, col_e2 = st.columns(2)
+        with col_e1:
+          nuevo_medico = st.text_input('Médico Tratante de Prórroga*')
+          nuevo_diagnostico = st.text_area(
+              'Diagnóstico / Motivo de Extensión*'
+          )
+          dias_adicionales = st.number_input(
+              'Días de Reposo Adicionales', min_value=1, max_value=90, value=7
+          )
+        with col_e2:
+          nueva_fecha_hasta = st.date_input(
+              'Nueva Fecha de Finalización de Reposo',
+              value=datetime.today().date() + timedelta(days=7),
+          )
+          nuevos_certificados = st.text_area(
+              '📄 Observaciones del Nuevo Certificado Presentado'
+          )
+
+        uploaded_ext = st.file_uploader(
+            '📎 Adjuntar PDF del Nuevo Certificado de Prórroga',
+            type=['pdf'],
+            key='up_ext',
+        )
+
+        if st.form_submit_button('Registrar Prórroga y Extender Reposo'):
+          if nuevo_medico and nuevo_diagnostico:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute(
+                'UPDATE notas_medicas SET fecha_hasta = ?, medicamentos = ?'
+                ' WHERE id_legajo = ? AND nro_expediente = ? AND estado_alta ='
+                " 'Pendiente'",
+                (
+                    str(nueva_fecha_hasta),
+                    (
+                        f'Prórroga de {dias_adicionales} días. Motivo:'
+                        f' {nuevo_diagnostico}'
+                    ),
+                    id_leg_ext,
+                    exp_ref,
+                ),
+            )
+
+            if uploaded_ext is not None:
+              ext_path = os.path.join(
+                  UPLOAD_DIR,
+                  f'{id_leg_ext}_PRORROGA_{uploaded_ext.name}',
+              )
+              with open(ext_path, 'wb') as f_ex:
+                f_ex.write(uploaded_ext.getbuffer())
+              cursor.execute(
+                  'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
+                  ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+                  ' VALUES (?, ?, ?, ?, ?, ?)',
+                  (
+                      id_leg_ext,
+                      f'Expediente {exp_ref} - Prórroga de Reposo',
+                      'PDF Prórroga',
+                      str(datetime.today().date()),
+                      ext_path,
+                      nuevo_diagnostico,
+                  ),
+              )
+            conn.commit()
+            conn.close()
+            st.success(
+                '¡Prórroga de reposo registrada y legajo actualizado'
+                ' correctamente!'
+            )
+            st.rerun()
+          else:
+            st.warning('Complete campos obligatorios (*).')
+    else:
+      st.info('No hay reposos activos para extender.')
+
+elif menu == '4. Exámenes Periódicos y Anuales':
+  st.markdown(
+      '<h2 style="color: #FFFFFF;">🧪 Exámenes Periódicos y Anuales</h2>',
+      unsafe_allow_html=True,
+  )
+  df_cadetes = obtener_cadetes()
+  if not df_cadetes.empty:
+    lista_cadetes = (
+        df_cadetes['id_legajo'].astype(str)
+        + ' - '
+        + df_cadetes['apellido_nombre']
+    ).tolist()
+    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
+    id_legajo = seleccion.split(' - ')[0]
+    cadete_info = df_cadetes[
+        df_cadetes['id_legajo'].astype(str) == id_legajo
+    ].iloc[0]
+    es_femenino = cadete_info['genero'] == 'Femenino'
+    with st.form('form_examenes'):
+      col1, col2 = st.columns(2)
+      with col1:
+        ddjj = st.selectbox('DDJJ', ['Aprobada', 'Observada'])
+        visus = st.text_input('Visus')
+        hemograma = st.selectbox('Hemograma', ['Normal', 'Alterado'])
+      with col2:
+        electro = st.selectbox('Electro', ['Normal', 'Patológico'])
+        aptitud = st.selectbox('Aptitud', ['Apto', 'No Apto'])
+        beta_hcg = (
+            st.selectbox(
+                'Cuantificación de Gonadotropina Coriónica Humana (Beta HCG)',
+                ['Negativo', 'Positivo', 'No Realizado'],
+            )
+            if es_femenino
+            else 'N/A'
+        )
+      if st.form_submit_button('Guardar Exámenes'):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO examenes_periodicos (id_legajo, anio,'
+            ' ddjj_enfermedades, visus, hemograma, orina, electrocardiograma,'
+            " aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?,"
+            " '2026', ?, ?, ?, 'Normal', ?, ?, 'Negativo', ?, ?)",
+            (
+                id_legajo,
+                ddjj,
+                visus,
+                hemograma,
+                electro,
+                aptitud,
+                beta_hcg,
+                str(datetime.today()),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        st.success('¡Exámenes guardados con éxito!')
+
+elif menu == '5. Historia Clínica Integral':
+  st.markdown(
+      '<h2 style="color: #FFFFFF;">📁 Legajo e Historia Clínica Integral del'
+      ' Cadete</h2>',
+      unsafe_allow_html=True,
+  )
+  df_cadetes = obtener_cadetes()
+  if not df_cadetes.empty:
+    busq_hc = st.text_input(
+        '🔍 Buscar Cadete por Apellido o Legajo para ver Historia Clínica'
+    )
+    df_hc_view = df_cadetes.copy()
+    if busq_hc:
+      busq_hc_str = str(busq_hc)
+      df_hc_view = df_hc_view[
+          df_hc_view['apellido_nombre'].str.contains(
+              busq_hc_str, case=False, na=False
+          )
+          | df_hc_view['id_legajo']
+          .astype(str)
+          .str.contains(busq_hc_str, case=False, na=False)
+      ]
+    if not df_hc_view.empty:
+      lista_hc = (
+          df_hc_view['id_legajo'].astype(str)
+          + ' - '
+          + df_hc_view['apellido_nombre']
+      ).tolist()
+      seleccion_hc = st.selectbox('Seleccione el Cadete de la Lista', lista_hc)
+      id_leg_hc = seleccion_hc.split(' - ')[0]
+      cad_hc = df_cadetes[
+          df_cadetes['id_legajo'].astype(str) == id_leg_hc
+      ].iloc[0]
+      st.markdown(
+          '<div class="profile-card"><h2>'
+          + str(cad_hc['apellido_nombre'])
+          + '</h2><p>Legajo: <b>'
+          + str(cad_hc['id_legajo'])
+          + '</b> | Curso: <b>'
+          + str(cad_hc['curso'])
+          + '</b> | DNI: <b>'
+          + str(cad_hc['dni'])
+          + '</b></p></div>',
+          unsafe_allow_html=True,
+      )
+      conn = sqlite3.connect(DB_NAME)
+      df_nm_hc = pd.read_sql_query(
+          f"SELECT * FROM notas_medicas WHERE id_legajo = '{id_leg_hc}'", conn
+      )
+      df_doc_hc = pd.read_sql_query(
+          f"SELECT * FROM legajo_documentos WHERE id_legajo = '{id_leg_hc}'", conn
+      )
+      conn.close()
+      st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
+      if not df_nm_hc.empty:
+        for _, r in df_nm_hc.iterrows():
+          exp_no = str(r['nro_expediente'])
+          diag = str(r['diagnostico'])
+          med = str(r['medico'])
+          rep = str(r['tipo_reposo'])
+          f_des = str(r['fecha_desde'])
+          f_has = str(r['fecha_hasta'])
+          est = str(r['estado_alta'])
+          cert_ind = (
+              str(r['certificados_indicaciones'])
+              if pd.notna(r['certificados_indicaciones'])
+              else 'Sin anexos'
+          )
+          an_est = (
+              str(r['analisis_estudios'])
+              if pd.notna(r['analisis_estudios'])
+              else 'Sin estudios'
+          )
+          card_html = (
+              '<div class="profile-card" style="border-left: 4px solid #38BDF8;">'
+              '<h4>Expediente: '
+              + exp_no
+              + ' | Diagnóstico: '
+              + diag
+              + '</h4><p><b>Médico:</b> '
+              + med
+              + ' | <b>Reposo:</b> '
+              + rep
+              + ' ('
+              + f_des
+              + ' al '
+              + f_has
+              + ') | <b>Estado:</b> '
+              + est
+              + '</p><p><b>Certificados e Indicaciones:</b><br>'
+              + cert_ind
+              + '</p><p><b>Análisis y Estudios:</b><br>'
+              + an_est
+              + '</p></div>'
+          )
+          st.markdown(card_html, unsafe_allow_html=True)
+      else:
+        st.write('Sin notas médicas.')
+      st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
+      if not df_doc_hc.empty:
+        for _, doc_row in df_doc_hc.iterrows():
+          t_doc = str(doc_row['titulo_documento'])
+          f_sub = str(doc_row['fecha_subida'])
+          f_path = str(doc_row['archivo_nombre'])
+          doc_id = str(doc_row['id'])
+          st.markdown(f'- **{t_doc}** (Subido el {f_sub})')
+          if os.path.exists(f_path):
+            with open(f_path, 'rb') as f:
+              st.download_button(
+                  label=f'📥 Descargar PDF: {f_path}',
+                  data=f.read(),
+                  file_name=f_path,
+                  mime='application/pdf',
+                  key=f'dl_{doc_id}',
+              )
+      else:
+        st.info('No hay documentos PDF en el legajo digital todavía.')
+
+elif menu == '6. Examen de Baja / Egreso':
+  st.markdown(
+      '<h2 style="color: #FFFFFF;">🚪 Examen Médico de Baja / Egreso</h2>',
+      unsafe_allow_html=True,
+  )
+  df_cadetes = obtener_cadetes()
+  if not df_cadetes.empty:
+    lista_cadetes = (
+        df_cadetes['id_legajo'].astype(str)
+        + ' - '
+        + df_cadetes['apellido_nombre']
+    ).tolist()
+    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
+    id_legajo = seleccion.split(' - ')[0]
+    with st.form('form_baja'):
+      motivo = st.selectbox(
+          'Motivo', ['Egreso', 'Baja Voluntaria', 'Baja Médica']
+      )
+      estado = st.text_area('Estado de Salud al Egreso')
+      if st.form_submit_button('Guardar Baja'):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO examen_baja (id_legajo, fecha_baja, motivo,'
+            ' estado_salud_egreso, observaciones_medicas) VALUES (?, ?, ?, ?, ?)',
+            (id_legajo, str(datetime.today().date()), motivo, estado, ''),
+        )
+        conn.commit()
+        conn.close()
+        st.success('¡Baja registrada con éxito!')
+
+elif menu == '7. Informes y Análisis de Datos (Spark)':
+  st.markdown(
+      '<h2 style="color: #FFFFFF;">📊 Análisis de Datos e Inteligencia'
+      ' Sanitaria (Spark Analytics)</h2>',
+      unsafe_allow_html=True,
+  )
+  st.markdown(
+      "<p style='color: #94A3B8;'>Motor de analítica avanzada para procesamiento"
+      ' masivo de datos de salud y morbilidad institucional.</p>',
+      unsafe_allow_html=True,
+  )
+
+  conn = sqlite3.connect(DB_NAME)
+  df_c_rep = pd.read_sql_query('SELECT * FROM cadetes', conn)
+  df_i_rep = pd.read_sql_query(
+      'SELECT i.*, c.curso, c.apellido_nombre FROM primera_intervencion i LEFT'
+      ' JOIN cadetes c ON i.id_legajo = c.id_legajo',
+      conn,
+  )
+  df_n_rep = pd.read_sql_query(
+      'SELECT n.*, c.curso, c.apellido_nombre FROM notas_medicas n LEFT JOIN'
+      ' cadetes c ON n.id_legajo = c.id_legajo',
+      conn,
+  )
+  conn.close()
+
+  col_s1, col_s2, col_s3 = st.columns(3)
+  with col_s1:
+    st.markdown(
+        f'<div class="metric-card"><div class="metric-value">{len(df_c_rep)}</div><div'
+        ' class="metric-label">Total Cadetes</div></div>',
+        unsafe_allow_html=True,
+    )
+  with col_s2:
+    st.markdown(
+        f'<div class="metric-card"><div class="metric-value">{len(df_i_rep)}</div><div'
+        ' class="metric-label">Atenciones Guardia</div></div>',
+        unsafe_allow_html=True,
+    )
+  with col_s3:
+    st.markdown(
+        f'<div class="metric-card"><div class="metric-value">{len(df_n_rep)}</div><div'
+        ' class="metric-label">Expedientes Médicos</div></div>',
+        unsafe_allow_html=True,
+    )
+
+  st.markdown('<br>', unsafe_allow_html=True)
+  spark_tab1, spark_tab2, spark_tab3 = st.tabs([
+      '📈 Morbilidad por Cursos',
+      '🏥 Distribución de Derivaciones',
+      '📋 Visor de Datos Analíticos',
+  ])
+
+  with spark_tab1:
+    st.markdown('### 📈 Concentración de Atenciones de Guardia por Curso')
+    if not df_i_rep.empty:
+      df_curso = df_i_rep.groupby('curso').size().reset_index(name='Atenciones')
+      st.dataframe(df_curso, use_container_width=True)
+      st.bar_chart(df_curso.set_index('curso'))
+    else:
+      st.info('No hay suficientes intervenciones registradas para graficar.')
+
+  with spark_tab2:
+    st.markdown('### 🏥 Demanda en Centros de Derivación Sanitaria')
+    if not df_i_rep.empty:
+      df_deriv = (
+          df_i_rep.groupby('derivacion').size().reset_index(name='Frecuencia')
+      )
+      st.dataframe(df_deriv, use_container_width=True)
+    else:
+      st.info('No hay datos de derivación suficientes.')
+
+  with spark_tab3:
+    st.markdown('### 📋 Estructura de Datos Consolidados')
+    if not df_i_rep.empty:
+      st.dataframe(df_i_rep, use_container_width=True)
+    else:
+      st.info('Sin datos para mostrar.')
+else:
+  st.markdown(f'## Módulo: {menu}')
