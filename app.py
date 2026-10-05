@@ -333,7 +333,8 @@ def init_db():
   cursor.execute(
       'CREATE TABLE IF NOT EXISTS primera_intervencion (id INTEGER PRIMARY KEY'
       ' AUTOINCREMENT, id_legajo TEXT, fecha_hora TEXT, profesional_atiende'
-      ' TEXT, sintomas TEXT, presion TEXT, saturacion TEXT, derivacion TEXT)'
+      ' TEXT, sintomas TEXT, presion TEXT, saturacion TEXT, temperatura TEXT,'
+      ' derivacion TEXT)'
   )
   cursor.execute(
       'CREATE TABLE IF NOT EXISTS notas_medicas (id INTEGER PRIMARY KEY'
@@ -371,7 +372,7 @@ def init_db():
     except sqlite3.OperationalError:
       pass
 
-  # Migración: asegurar columnas en primera_intervencion (DB con esquema viejo)
+  # Migración: asegurar columnas en primera_intervencion (incluyendo temperatura)
   for col, col_type in [
       ('id_legajo', 'TEXT'),
       ('fecha_hora', 'TEXT'),
@@ -379,6 +380,7 @@ def init_db():
       ('sintomas', 'TEXT'),
       ('presion', 'TEXT'),
       ('saturacion', 'TEXT'),
+      ('temperatura', 'TEXT'),
       ('derivacion', 'TEXT'),
   ]:
     try:
@@ -417,11 +419,9 @@ def logo_uri(nombre, alto=120):
     from PIL import ImageDraw, ImageFilter
 
     im = Image.open(ruta).convert('RGBA')
-    # Los logos tienen zonas internas transparentes (ej. el círculo blanco).
-    # Se rellenan de blanco para que se vean bien sobre el fondo oscuro.
     m = im.getchannel('A').point(lambda a: 255 if a < 16 else 0)
     if m.getpixel((0, 0)) == 255:
-      ImageDraw.floodfill(m, (0, 0), 128)  # marca el exterior
+      ImageDraw.floodfill(m, (0, 0), 128)
       huecos = m.point(lambda v: 255 if v == 255 else 0).filter(
           ImageFilter.MaxFilter(5)
       )
@@ -1107,7 +1107,7 @@ elif menu == 'Personal del Gabinete':
   if not df_p_gen.empty:
     cp1, cp2, cp3 = st.columns(3)
     with cp1:
-      st.markdown(kpi_card('🧑‍⚕️️', len(df_p_gen), 'Total staff activo', '#38BDF8'), unsafe_allow_html=True)
+      st.markdown(kpi_card('🧑‍⚕️', len(df_p_gen), 'Total staff activo', '#38BDF8'), unsafe_allow_html=True)
     with cp2:
       medicos_count = len(df_p_gen[df_p_gen['especialidad'].str.contains('Médico', case=False, na=False)])
       st.markdown(kpi_card('🩺', medicos_count, 'Médicos / Clínicos', '#34D399'), unsafe_allow_html=True)
@@ -1236,8 +1236,9 @@ elif menu == '1. Primera Intervención':
         )
         sintomas = st.text_area('Síntomas / Motivo*')
       with col2:
-        presion = st.text_input('Presión Arterial')
-        saturacion = st.text_input('Saturación O2')
+        presion = st.text_input('Presión Arterial', placeholder='Ej: 120/80')
+        saturacion = st.text_input('Saturación O2', placeholder='Ej: 98%')
+        temperatura = st.text_input('Temperatura (°C)', placeholder='Ej: 36.5')
         derivacion = st.selectbox(
             'Derivación / Especialista*',
             [
@@ -1264,8 +1265,8 @@ elif menu == '1. Primera Intervención':
           try:
             cursor.execute(
                 'INSERT INTO primera_intervencion (id_legajo, fecha_hora,'
-                ' profesional_atiende, sintomas, presion, saturacion,'
-                ' derivacion) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                ' profesional_atiende, sintomas, presion, saturacion, temperatura,'
+                ' derivacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 (
                     id_legajo,
                     fecha_hora,
@@ -1273,6 +1274,7 @@ elif menu == '1. Primera Intervención':
                     sintomas,
                     presion,
                     saturacion,
+                    temperatura,
                     derivacion_final,
                 ),
             )
