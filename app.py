@@ -987,7 +987,7 @@ if menu == 'Dashboard General':
         ]
       st.dataframe(df_c_view, use_container_width=True)
   with dash_tab3:
-    st.markdown('### ⚙️ Administración e Institución')
+    st.markdown('### ⚙️️ Administración e Institución')
     if st.button('Sincronizar Base de Cadetes Ahora'):
       exito, msg = importar_excel_directo()
       if exito:
