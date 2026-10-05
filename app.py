@@ -618,7 +618,7 @@ _logo_gab = logo_uri('GABINETE.png', 116)
 _brand_logo = (
     f'<div class="brand-logo has-img"><img src="{_logo_gab}" alt="Gabinete"></div>'
     if _logo_gab
-    else '<div class="brand-logo">🛡️️</div>'
+    else '<div class="brand-logo">🛡️</div>'
 )
 st.sidebar.markdown(
     f'<div class="brand">{_brand_logo}<div><div'
@@ -1227,7 +1227,6 @@ elif menu == '1. Primera Intervención':
     with st.form('form_intervencion'):
       col1, col2 = st.columns(2)
       with col1:
-        # Hora actual exacta de Argentina (UTC-3)
         hora_arg = (datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
         fecha_hora = st.text_input('Fecha y Hora', value=hora_arg)
         profesional_atiende = st.selectbox(
@@ -1264,8 +1263,8 @@ elif menu == '1. Primera Intervención':
           try:
             cursor.execute(
                 'INSERT INTO primera_intervencion (id_legajo, fecha_hora,'
-                ' profesional_atiende, sintomas, presion, saturacion, temperatura,'
-                ' derivacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                ' profesional_atiende, sintomas, presion, saturacion,'
+                ' derivacion) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 (
                     id_legajo,
                     fecha_hora,
@@ -1273,7 +1272,6 @@ elif menu == '1. Primera Intervención':
                     sintomas,
                     presion,
                     saturacion,
-                    temperatura,
                     derivacion_final,
                 ),
             )
@@ -1439,13 +1437,7 @@ elif menu == '2. Notas Médicas y Reposos':
 
 elif menu == '3. Control de Alta':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">✅ Control y Gestión de Altas Médicas</h2>',
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      "<p style='color: #94A3B8;'>Convalide el alta médica reglamentaria o"
-      ' registre la extensión de reposo por presentación de nuevos'
-      ' certificados o días adicionales.</p>',
+      '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide el alta médica reglamentaria adjuntando el certificado oficial o registre extensiones de reposo.</p></div>',
       unsafe_allow_html=True,
   )
 
@@ -1458,13 +1450,14 @@ elif menu == '3. Control de Alta':
   conn.close()
 
   alta_tab1, alta_tab2 = st.tabs([
-      '1️⃣ Convalidar Alta Médica',
+      '1️⃣ Convalidar Alta Médica y Adjuntar Certificado',
       '2️⃣ Extensión de Reposo / Prórroga',
   ])
 
   with alta_tab1:
-    st.markdown('### Convalidación de Alta por Cierre de Reposo')
+    st.markdown('<br>', unsafe_allow_html=True)
     if not df_pendientes.empty:
+      st.markdown('<div class="panel"><h3>Expedientes con Reposo Pendiente de Alta</h3></div>', unsafe_allow_html=True)
       st.dataframe(
           df_pendientes[[
               'id',
@@ -1478,27 +1471,51 @@ elif menu == '3. Control de Alta':
           ]],
           use_container_width=True,
       )
-      exp_id = st.selectbox(
-          'Seleccione el ID del Expediente para Convalidar Alta',
-          df_pendientes['id'].tolist(),
-          key='sel_alta',
-      )
-      if st.button('Convalidar Alta Médica Oficial'):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id"
-            ' = ?',
-            (exp_id,),
-        )
-        conn.commit()
-        conn.close()
-        st.success('¡Alta médica convalidada con éxito!')
-        st.rerun()
+      
+      cadetes_alta_lista = (df_pendientes['id'].astype(str) + " - " + df_pendientes['apellido_nombre'] + " (Exp: " + df_pendientes['nro_expediente'] + ")").tolist()
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      st.markdown('<div class="panel"><h3>Formulario Oficial de Alta Médica</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese los datos del médico otorgante y adjunte el certificado PDF correspondiente.</p></div>', unsafe_allow_html=True)
+      
+      sel_alta_form = st.selectbox('Seleccione el Expediente para Convalidar Alta', cadetes_alta_lista, key='sel_alta_form_unique')
+      exp_id = int(sel_alta_form.split(' - ')[0])
+      exp_row = df_pendientes[df_pendientes['id'] == exp_id].iloc[0]
+      
+      with st.form('form_convalidar_alta'):
+        col_a1, col_a2 = st.columns(2, gap='medium')
+        with col_a1:
+          medico_alta = st.text_input('Médico Tratante / Matrícula que otorga el Alta *', placeholder='Ej: Dr. Gómez / MP-4521').strip()
+          fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=datetime.today().date())
+        with col_a2:
+          observaciones_alta = st.text_area('Observaciones Clínicas de Alta / Aptitud', placeholder='Paciente recuperado, sin secuelas, apto para retomar actividades.')
+        
+        uploaded_alta_pdf = st.file_uploader('📎 Adjuntar Certificado de Alta Médico (PDF)', type=['pdf'], key='up_alta_pdf')
+        
+        st.markdown('<br>', unsafe_allow_html=True)
+        if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Archivar'):
+          if medico_alta:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id = ?", (exp_id,))
+            
+            if uploaded_alta_pdf is not None:
+              alta_path = os.path.join(UPLOAD_DIR, f"{exp_row['id_legajo']}_ALTA_{exp_row['nro_expediente']}_{uploaded_alta_pdf.name}")
+              with open(alta_path, 'wb') as f_al:
+                f_al.write(uploaded_alta_pdf.getbuffer())
+              cursor.execute('INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
+                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta Médica", 'PDF Alta', str(datetime.today().date()), alta_path, f"Médico: {medico_alta} | {observaciones_alta}"))
+            
+            conn.commit()
+            conn.close()
+            st.success('¡Alta médica convalidada y certificado PDF archivado con éxito en el legajo!')
+            st.rerun()
+          else:
+            st.warning('Debe completar el nombre o matrícula del médico que otorga el alta.')
     else:
-      st.info('ℹ️ No hay expedientes pendientes de alta.')
+      st.info('ℹ️ No hay expedientes pendientes de alta médica.')
 
   with alta_tab2:
+    st.markdown('<br>', unsafe_allow_html=True)
     st.markdown('### Registro de Prórroga o Más Días de Reposo')
     st.markdown(
         "<p style='color: #94A3B8;'>Si el cadete presenta un nuevo certificado"
