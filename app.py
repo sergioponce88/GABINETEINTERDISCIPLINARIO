@@ -1131,7 +1131,7 @@ elif menu == 'Personal del Gabinete':
       
   with tab_p2:
     st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown('<div class="panel"><h3>Registro de Nuevo Profesional</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese la información requerida y la matrícula oficial del profesional.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Registro de Nuevo Profesional</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese la información requerida, matrícula y el cargo o especialidad institucional.</p></div>', unsafe_allow_html=True)
     
     with st.form('form_personal'):
       col1, col2 = st.columns(2, gap='medium')
@@ -1140,16 +1140,13 @@ elif menu == 'Personal del Gabinete':
         ap_nom_pers = st.text_input('Apellido y Nombres *', placeholder='Ej: LÓPEZ, AGOSTINA').strip()
         dni_pers = st.text_input('DNI', placeholder='Ej: 32132121').strip()
       with col2:
-        mat_pers = st.text_input('Matrícula Profesional *', placeholder='Ej: MP-12312').strip()
-        esp_pers = st.selectbox('Especialidad', [
-            'Médico/a Clínico/a', 'Psicólogo/a', 'Psicopedagogo/a',
-            'Psiquiatra', 'Enfermero/a', 'Administrativo/a', 'Otro'
-        ])
+        mat_pers = st.text_input('Matrícula Profesional *', placeholder='Ej: MP-12312 (o S/M)').strip()
+        esp_pers = st.text_input('Especialidad / Cargo / Rango *', placeholder='Ej: Comisario / Jefa / Médico Clínico').strip()
         tel_pers = st.text_input('Teléfono de Contacto', placeholder='Ej: 3816545454').strip()
         
       st.markdown('<br>', unsafe_allow_html=True)
       if st.form_submit_button('💾 Registrar Profesional en Staff'):
-        if leg_pers and ap_nom_pers and mat_pers:
+        if leg_pers and ap_nom_pers and mat_pers and esp_pers:
           try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
@@ -1228,8 +1225,10 @@ elif menu == '1. Primera Intervención':
     with st.form('form_intervencion'):
       col1, col2 = st.columns(2)
       with col1:
-        hora_arg = (datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
-        fecha_hora = st.text_input('Fecha y Hora', value=hora_arg)
+        fecha_hora = st.text_input(
+            'Fecha y Hora',
+            value=str((datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')),
+        )
         profesional_atiende = st.selectbox(
             'Profesional que Atiende*', lista_profesionales
         )
@@ -1825,13 +1824,7 @@ elif menu == '6. Examen de Baja / Egreso':
 
 elif menu == '7. Informes y Análisis de Datos (Spark)':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">📊 Análisis de Datos e Inteligencia'
-      ' Sanitaria (Spark Analytics)</h2>',
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      "<p style='color: #94A3B8;'>Motor de analítica avanzada para procesamiento"
-      ' masivo de datos de salud y morbilidad institucional.</p>',
+      '<div class="pro-header"><p class="pro-title">📊 Inteligencia Sanitaria & Analytics</p><p class="pro-subtitle">Cuadro de mando directivo, morbilidad institucional y analítica avanzada de salud en tiempo real.</p></div>',
       unsafe_allow_html=True,
   )
 
@@ -1847,59 +1840,113 @@ elif menu == '7. Informes y Análisis de Datos (Spark)':
       ' cadetes c ON n.id_legajo = c.id_legajo',
       conn,
   )
+  df_e_rep = pd.read_sql_query(
+      'SELECT e.*, c.curso, c.apellido_nombre, c.genero FROM examenes_periodicos e LEFT JOIN cadetes c ON e.id_legajo = c.id_legajo',
+      conn,
+  )
   conn.close()
 
-  col_s1, col_s2, col_s3 = st.columns(3)
+  # Tarjetas superiores directivas
+  col_s1, col_s2, col_s3, col_s4 = st.columns(4)
   with col_s1:
-    st.markdown(
-        f'<div class="metric-card"><div class="metric-value">{len(df_c_rep)}</div><div'
-        ' class="metric-label">Total Cadetes</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('👥', len(df_c_rep), 'Total compañía', '#38BDF8', 'Base activa'), unsafe_allow_html=True)
   with col_s2:
-    st.markdown(
-        f'<div class="metric-card"><div class="metric-value">{len(df_i_rep)}</div><div'
-        ' class="metric-label">Atenciones Guardia</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('🩺', len(df_i_rep), 'Atenciones guardia', '#A78BFA', 'Intervenciones'), unsafe_allow_html=True)
   with col_s3:
-    st.markdown(
-        f'<div class="metric-card"><div class="metric-value">{len(df_n_rep)}</div><div'
-        ' class="metric-label">Expedientes Médicos</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(kpi_card('📋', len(df_n_rep), 'Expedientes médicos', '#34D399', 'Notas y reposos'), unsafe_allow_html=True)
+  with col_s4:
+    pend_count = len(df_n_rep[df_n_rep['estado_alta'] == 'Pendiente']) if not df_n_rep.empty else 0
+    st.markdown(kpi_card('⏳', pend_count, 'Altas pendientes', '#FBBF24', 'Sin convalidar'), unsafe_allow_html=True)
 
   st.markdown('<br>', unsafe_allow_html=True)
-  spark_tab1, spark_tab2, spark_tab3 = st.tabs([
-      '📈 Morbilidad por Cursos',
-      '🏥 Distribución de Derivaciones',
-      '📋 Visor de Datos Analíticos',
+  spark_tab1, spark_tab2, spark_tab3, spark_tab4 = st.tabs([
+      '📈 Morbilidad y Diagnósticos',
+      '🏥 Guardia y Derivaciones',
+      '⏳ Tiempos y Reposos',
+      '🧪 Prevención y Anuales',
   ])
 
   with spark_tab1:
-    st.markdown('### 📈 Concentración de Atenciones de Guardia por Curso')
-    if not df_i_rep.empty:
-      df_curso = df_i_rep.groupby('curso').size().reset_index(name='Atenciones')
-      st.dataframe(df_curso, use_container_width=True)
-      st.bar_chart(df_curso.set_index('curso'))
-    else:
-      st.info('No hay suficientes intervenciones registradas para graficar.')
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Análisis de Morbilidad Institucional</h3><p style="color: var(--muted); font-size: 0.88rem;">Distribución de consultas por curso y principales diagnósticos registrados en notas médicas.</p></div>', unsafe_allow_html=True)
+    
+    col_m1, col_m2 = st.columns(2, gap='medium')
+    with col_m1:
+      st.markdown('#### 📚 Atenciones de Guardia por Curso')
+      if not df_i_rep.empty:
+        df_curso = df_i_rep.groupby('curso').size().reset_index(name='Atenciones')
+        st.dataframe(df_curso, use_container_width=True)
+        try:
+          import altair as alt
+          chart_curso = alt.Chart(df_curso).mark_bar(color='#38BDF8', cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=28).encode(
+              x=alt.X('curso:N', axis=alt.Axis(title=None, labelColor='#8A97B1', domainColor='#1C2740', tickColor='#1C2740', labelAngle=0)),
+              y=alt.Y('Atenciones:Q', axis=alt.Axis(title=None, tickMinStep=1, labelColor='#8A97B1', gridColor='#1C2740', domain=False)),
+              tooltip=['curso:N', 'Atenciones:Q']
+          ).properties(height=200, background='transparent').configure_view(strokeWidth=0)
+          st.altair_chart(chart_curso, use_container_width=True, theme=None)
+        except Exception:
+          st.bar_chart(df_curso.set_index('curso'), color='#38BDF8')
+      else:
+        st.info('Sin registros de guardia suficientes.')
+        
+    with col_m2:
+      st.markdown('#### 🩺 Tipos de Reposo Otorgados')
+      if not df_n_rep.empty:
+        df_rep = df_n_rep.groupby('tipo_reposo').size().reset_index(name='Cantidad')
+        st.dataframe(df_rep, use_container_width=True)
+        try:
+          import altair as alt
+          chart_rep = alt.Chart(df_rep).mark_bar(color='#A78BFA', cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=28).encode(
+              x=alt.X('tipo_reposo:N', axis=alt.Axis(title=None, labelColor='#8A97B1', domainColor='#1C2740', tickColor='#1C2740', labelAngle=-10)),
+              y=alt.Y('Cantidad:Q', axis=alt.Axis(title=None, tickMinStep=1, labelColor='#8A97B1', gridColor='#1C2740', domain=False)),
+              tooltip=['tipo_reposo:N', 'Cantidad:Q']
+          ).properties(height=200, background='transparent').configure_view(strokeWidth=0)
+          st.altair_chart(chart_rep, use_container_width=True, theme=None)
+        except Exception:
+          st.bar_chart(df_rep.set_index('tipo_reposo'), color='#A78BFA')
+      else:
+        st.info('Sin registros de reposos suficientes.')
 
   with spark_tab2:
-    st.markdown('### 🏥 Demanda en Centros de Derivación Sanitaria')
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Demanda en Centros de Derivación Sanitaria</h3><p style="color: var(--muted); font-size: 0.88rem;">Volumen y frecuencia de derivaciones externas e internas solicitadas por el gabinete.</p></div>', unsafe_allow_html=True)
     if not df_i_rep.empty:
-      df_deriv = (
-          df_i_rep.groupby('derivacion').size().reset_index(name='Frecuencia')
-      )
-      st.dataframe(df_deriv, use_container_width=True)
+      df_deriv = df_i_rep.groupby('derivacion').size().reset_index(name='Frecuencia').sort_values(by='Frecuencia', ascending=False)
+      c_d1, c_d2 = st.columns([1, 1.5], gap='large')
+      with c_d1:
+        st.dataframe(df_deriv, use_container_width=True)
+      with c_d2:
+        try:
+          import altair as alt
+          chart_deriv = alt.Chart(df_deriv).mark_bar(color='#34D399', cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=28).encode(
+              x=alt.X('derivacion:N', axis=alt.Axis(title=None, labelColor='#8A97B1', domainColor='#1C2740', tickColor='#1C2740', labelAngle=-15)),
+              y=alt.Y('Frecuencia:Q', axis=alt.Axis(title=None, tickMinStep=1, labelColor='#8A97B1', gridColor='#1C2740', domain=False)),
+              tooltip=['derivacion:N', 'Frecuencia:Q']
+          ).properties(height=220, background='transparent').configure_view(strokeWidth=0)
+          st.altair_chart(chart_deriv, use_container_width=True, theme=None)
+        except Exception:
+          st.bar_chart(df_deriv.set_index('derivacion'), color='#34D399')
     else:
       st.info('No hay datos de derivación suficientes.')
 
   with spark_tab3:
-    st.markdown('### 📋 Estructura de Datos Consolidados')
-    if not df_i_rep.empty:
-      st.dataframe(df_i_rep, use_container_width=True)
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Estado de Expedientes y Cierre de Reposos</h3><p style="color: var(--muted); font-size: 0.88rem;">Monitoreo del estado administrativo de alta para cada expediente médico.</p></div>', unsafe_allow_html=True)
+    if not df_n_rep.empty:
+      df_est = df_n_rep.groupby('estado_alta').size().reset_index(name='Total')
+      st.dataframe(df_est, use_container_width=True)
+      st.markdown('#### 📋 Visor Consolidado de Notas Médicas')
+      st.dataframe(df_n_rep[['nro_expediente', 'id_legajo', 'apellido_nombre', 'curso', 'medico', 'tipo_reposo', 'fecha_desde', 'fecha_hasta', 'estado_alta']], use_container_width=True)
     else:
-      st.info('Sin datos para mostrar.')
+      st.info('No hay notas médicas registradas.')
+
+  with spark_tab4:
+    st.markdown('<br>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h3>Salud Preventiva y Exámenes Anuales</h3><p style="color: var(--muted); font-size: 0.88rem;">Control de declaraciones juradas, aptitud física y trazabilidad de controles trimestrales (Beta HCG).</p></div>', unsafe_allow_html=True)
+    if not df_e_rep.empty:
+      st.markdown('#### 📊 Registro General de Exámenes Periódicos')
+      st.dataframe(df_e_rep, use_container_width=True)
+    else:
+      st.info('No hay exámenes periódicos registrados todavía.')
 else:
   st.markdown(f'## Módulo: {menu}')
