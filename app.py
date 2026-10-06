@@ -141,7 +141,7 @@ def _conn():
     return conn
 
 def nombre_seguro(nombre, unico=True):
-    base = os.path.basename(str(nombre).replace('\', '/'))
+    base = os.path.basename(str(nombre).replace('\\', '/'))
     raiz, ext = os.path.splitext(base)
     raiz = re.sub(r'[^A-Za-z0-9._-]+', '_', raiz).strip('._') or 'archivo'
     ext = re.sub(r'[^A-Za-z0-9.]+', '', ext)[:10] or '.pdf'
