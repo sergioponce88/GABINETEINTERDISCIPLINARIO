@@ -39,6 +39,38 @@ UPLOAD_DIR = 'documentos_legajos'
 if not os.path.exists(UPLOAD_DIR):
   os.makedirs(UPLOAD_DIR)
 
+def _buscar_logo(nombre):
+  for carpeta in ('.', 'assets', 'imagenes', 'img'):
+    if os.path.isdir(carpeta):
+      for f in os.listdir(carpeta):
+        if f.lower() == nombre.lower():
+          return os.path.join(carpeta, f)
+  return None
+
+@st.cache_data(show_spinner=False)
+def logo_uri(nombre, alto=120):
+  ruta = _buscar_logo(nombre)
+  if not ruta:
+    return ''
+  try:
+    import base64
+    import io
+    from PIL import Image, ImageDraw, ImageFilter
+    im = Image.open(ruta).convert('RGBA')
+    m = im.getchannel('A').point(lambda a: 255 if a < 16 else 0)
+    if m.getpixel((0, 0)) == 255:
+      ImageDraw.floodfill(m, (0, 0), 128)
+      huecos = m.point(lambda v: 255 if v == 255 else 0).filter(ImageFilter.MaxFilter(5))
+      blanco = Image.new('RGBA', im.size, (255, 255, 255, 255))
+      im = Image.composite(Image.alpha_composite(blanco, im), im, huecos)
+    ancho = max(1, round(im.width * alto / im.height))
+    im = im.resize((ancho, alto), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, format='PNG', optimize=True)
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+  except Exception:
+    return ''
+
 # ============================================================================
 # MÓDULO DE SEGURIDAD Y ROLES (RBAC + Auditoría)
 # ============================================================================
@@ -109,7 +141,7 @@ def _conn():
     return conn
 
 def nombre_seguro(nombre, unico=True):
-    base = os.path.basename(str(nombre).replace('\\', '/'))
+    base = os.path.basename(str(nombre).replace('\', '/'))
     raiz, ext = os.path.splitext(base)
     raiz = re.sub(r'[^A-Za-z0-9._-]+', '_', raiz).strip('._') or 'archivo'
     ext = re.sub(r'[^A-Za-z0-9.]+', '', ext)[:10] or '.pdf'
@@ -350,14 +382,6 @@ def render_analisis_avanzado(db_name):
 # ============================================================================
 # APLICACIÓN PRINCIPAL (APP.PY)
 # ============================================================================
-def _buscar_logo(nombre):
-  for carpeta in ('.', 'assets', 'imagenes', 'img'):
-    if os.path.isdir(carpeta):
-      for f in os.listdir(carpeta):
-        if f.lower() == nombre.lower():
-          return os.path.join(carpeta, f)
-  return None
-
 try:
   from PIL import Image as _PILImage
   _ruta_icono = _buscar_logo('GABINETE.png')
