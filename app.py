@@ -150,35 +150,33 @@ def init_seguridad():
     conn = _conn()
     cur = conn.cursor()
     roles_sql = ', '.join(f"'{r}'" for r in ROLES)
-    cur.execute('''
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        nombre_completo TEXT NOT NULL,
-        rol TEXT NOT NULL,
-        legajo_personal TEXT,
-        activo INTEGER NOT NULL DEFAULT 1,
-        fecha_creacion TEXT NOT NULL,
-        debe_cambiar_password INTEGER NOT NULL DEFAULT 0,
-        intentos_fallidos INTEGER NOT NULL DEFAULT 0,
-        bloqueado_hasta TEXT
-      )
-    ''')
-    cur.execute('''
-      CREATE TABLE IF NOT EXISTS auditoria_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha_hora TEXT NOT NULL,
-        usuario TEXT NOT NULL,
-        rol TEXT,
-        modulo TEXT NOT NULL,
-        accion TEXT NOT NULL,
-        detalle TEXT,
-        id_referencia TEXT,
-        hash_prev TEXT,
-        hash_registro TEXT
-      )
-    ''')
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS usuarios ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "username TEXT UNIQUE NOT NULL, "
+        "password_hash TEXT NOT NULL, "
+        "nombre_completo TEXT NOT NULL, "
+        "rol TEXT NOT NULL, "
+        "legajo_personal TEXT, "
+        "activo INTEGER NOT NULL DEFAULT 1, "
+        "fecha_creacion TEXT NOT NULL, "
+        "debe_cambiar_password INTEGER NOT NULL DEFAULT 0, "
+        "intentos_fallidos INTEGER NOT NULL DEFAULT 0, "
+        "bloqueado_hasta TEXT)"
+    )
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS auditoria_logs ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "fecha_hora TEXT NOT NULL, "
+        "usuario TEXT NOT NULL, "
+        "rol TEXT, "
+        "modulo TEXT NOT NULL, "
+        "accion TEXT NOT NULL, "
+        "detalle TEXT, "
+        "id_referencia TEXT, "
+        "hash_prev TEXT, "
+        "hash_registro TEXT)"
+    )
     conn.commit()
     if cur.execute('SELECT COUNT(*) FROM usuarios').fetchone()[0] == 0:
         pw = os.environ.get('ADMIN_INITIAL_PASSWORD', 'Admin2026*')
@@ -458,35 +456,31 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown('''<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-:root { --bg: #05070D; --surface: #0C1220; --surface-2: #111A2E; --border: #1C2740; --text: #E6EAF2; --muted: #8A97B1; --accent: #3B82F6; --accent-2: #22D3EE; --ok: #10B981; --warn: #F59E0B; --crit: #EF4444; --info: #38BDF8; }
-html, body, [class*="css"], .stApp, button, input, textarea, select { font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif !important; }
-.stApp { background: radial-gradient(900px 400px at 85% -10%, rgba(59,130,246,0.10), transparent 60%), radial-gradient(700px 380px at -5% 0%, rgba(34,211,238,0.06), transparent 60%), var(--bg); color: var(--text); }
-[data-testid="stHeader"] { background: transparent; }
-footer { visibility: hidden; }
-.block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1400px; }
-h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: #FFFFFF !important; font-weight: 800 !important; }
-[data-testid="stSidebar"] { background: linear-gradient(180deg, #0A1020 0%, #070B16 100%); border-right: 1px solid var(--border); }
-.brand { display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.2rem 1.1rem 0.2rem; border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }
-.brand-logo { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: linear-gradient(135deg, #2563EB, #22D3EE); }
-.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF; }
-.brand-sub { font-size: 0.74rem; color: var(--muted); }
-.brand-logo.has-img { background: none; box-shadow: none; width: 54px; height: 58px; }
-.brand-logo img { width: 100%; height: 100%; object-fit: contain; }
-.nav-label { font-size: 0.68rem; font-weight: 700; color: #5F6C88; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }
-.side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px; font-size: 0.74rem; color: var(--muted); background: rgba(17,26,46,0.6); }
-.hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; padding: 2rem 2.2rem; border-radius: 22px; margin-bottom: 1.4rem; border: 1px solid #22305A; background: radial-gradient(600px 220px at 100% 0%, rgba(34,211,238,0.18), transparent 65%), radial-gradient(500px 260px at 0% 100%, rgba(99,102,241,0.25), transparent 65%), linear-gradient(135deg, #0B1330 0%, #121B45 100%); }
-.kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }
-.kpi-icon { flex: 0 0 auto; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; font-size: 1.45rem; background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
-.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF; }
-.kpi-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; }
-.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem; background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }
-.pro-header { background: linear-gradient(135deg, #0B1330 0%, #121B45 100%); padding: 2rem; border-radius: 20px; border: 1px solid #22305A; color: white; margin-bottom: 1.5rem; }
-.pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF; }
-.pro-subtitle { font-size: 1rem; color: #93C5FD; margin-top: 0.4rem; }
-.profile-card { background: linear-gradient(135deg, #0F172A 0%, #111B33 100%); padding: 1.5rem 1.75rem; border-radius: 18px; border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; }
-</style>''', unsafe_allow_html=True)
+st.markdown('<style>'
+'@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");'
+':root { --bg: #05070D; --surface: #0C1220; --surface-2: #111A2E; --border: #1C2740; --text: #E6EAF2; --muted: #8A97B1; --accent: #3B82F6; --accent-2: #22D3EE; --ok: #10B981; --warn: #F59E0B; --crit: #EF4444; --info: #38BDF8; }'
+'html, body, [class*="css"], .stApp, button, input, textarea, select { font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif !important; }'
+'.stApp { background: var(--bg); color: var(--text); }'
+'[data-testid="stHeader"] { background: transparent; }'
+'footer { visibility: hidden; }'
+'.block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1400px; }'
+'h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: #FFFFFF !important; font-weight: 800 !important; }'
+'[data-testid="stSidebar"] { background: linear-gradient(180deg, #0A1020 0%, #070B16 100%); border-right: 1px solid var(--border); }'
+'.brand { display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.2rem 1.1rem 0.2rem; border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }'
+'.brand-logo { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: linear-gradient(135deg, #2563EB, #22D3EE); }'
+'.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF; }'
+'.brand-sub { font-size: 0.74rem; color: var(--muted); }'
+'.nav-label { font-size: 0.68rem; font-weight: 700; color: #5F6C88; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }'
+'.side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px; font-size: 0.74rem; color: var(--muted); background: rgba(17,26,46,0.6); }'
+'.hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; padding: 2rem 2.2rem; border-radius: 22px; margin-bottom: 1.4rem; border: 1px solid #22305A; background: linear-gradient(135deg, #0B1330 0%, #121B45 100%); }'
+'.kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }'
+'.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF; }'
+'.kpi-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; }'
+'.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem; background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }'
+'.pro-header { background: linear-gradient(135deg, #0B1330 0%, #121B45 100%); padding: 2rem; border-radius: 20px; border: 1px solid #22305A; color: white; margin-bottom: 1.5rem; }'
+'.pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF; }'
+'.pro-subtitle { font-size: 1rem; color: #93C5FD; margin-top: 0.4rem; }'
+'</style>', unsafe_allow_html=True)
 
 init_seguridad()
 
