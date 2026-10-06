@@ -140,4 +140,257 @@ def init_seguridad(db_name):
         password_hash TEXT NOT NULL,
         nombre_completo TEXT NOT NULL,
         rol TEXT NOT NULL CHECK (rol IN ({roles_sql})),
-        leg
+        legajo_personal TEXT,
+        activo INTEGER NOT NULL DEFAULT 1,
+        fecha_creacion TEXT NOT NULL,
+        debe_cambiar_password INTEGER NOT NULL DEFAULT 0,
+        intentos_fallidos INTEGER NOT NULL DEFAULT 0,
+        bloqueado_hasta TEXT
+      )''')
+    cur.execute('''
+      CREATE TABLE IF NOT EXISTS auditoria_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha_hora TEXT NOT NULL,
+        usuario TEXT NOT NULL,
+        rol TEXT,
+        modulo TEXT NOT NULL,
+        accion TEXT NOT NULL,
+        detalle TEXT,
+        id_referencia TEXT,
+        hash_prev TEXT,
+        hash_registro TEXT
+      )''')
+    conn.commit()
+    if cur.execute('SELECT COUNT(*) FROM usuarios').fetchone()[0] == 0:
+        pw = os.environ.get('ADMIN_INITIAL_PASSWORD', 'Admin2026*')
+        cur.execute('INSERT INTO usuarios (username, password_hash, nombre_completo, rol, activo, fecha_creacion, debe_cambiar_password) VALUES (?, ?, ?, ?, 1, ?, 1)',
+                    ('admin', hash_password(pw), 'Administrador del Sistema', ROL_ADMIN, _ts()))
+        conn.commit()
+    conn.close()
+
+def registrar_auditoria(modulo, accion, detalle, id_referencia=None):
+    try:
+        u = st.session_state.get('auth_user') or {}
+        username = u.get('username', 'sistema')
+        rol = u.get('rol', 'Sistema')
+        fecha = _ts()
+        detalle = str(detalle or '')[:1000]
+        ref = None if id_referencia is None else str(id_referencia)[:200]
+        conn = _conn()
+        fila = conn.execute('SELECT hash_registro FROM auditoria_logs ORDER BY id DESC LIMIT 1').fetchone()
+        prev = fila[0] if fila and fila[0] else ''
+        payload = json.dumps([prev, fecha, username, rol, modulo, accion, detalle, ref], ensure_ascii=False)
+        h = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+        conn.execute('INSERT INTO auditoria_logs (fecha_hora, usuario, rol, modulo, accion, detalle, id_referencia, hash_prev, hash_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                     (fecha, username, rol, modulo, accion, detalle, ref, prev, h))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error auditoria: {e}")
+
+def auditar_vista(modulo, detalle, id_referencia):
+    clave = f'_aud_vista_{modulo}'
+    if st.session_state.get(clave) != id_referencia:
+        st.session_state[clave] = id_referencia
+        registrar_auditoria(modulo, 'VIEW', detalle, id_referencia)
+
+def autenticar(username, password):
+    username = (username or '').strip().lower()
+    conn = _conn()
+    conn.row_factory = sqlite3.Row
+    u = conn.execute('SELECT * FROM usuarios WHERE username = ?', (username,)).fetchone()
+    conn.close()
+    if not u:
+        return None, 'Usuario o contraseña incorrectos.'
+    if u['bloqueado_hasta'] and u['bloqueado_hasta'] > _ts():
+        return None, 'Cuenta bloqueada temporalmente.'
+    if not verify_password(password, u['password_hash']):
+        return None, 'Usuario o contraseña incorrectos.'
+    if not u['activo']:
+        return None, 'Cuenta inactiva.'
+    return dict(u), 'OK'
+
+def cerrar_sesion(motivo='Cierre de sesión'):
+    for k in list(st.session_state.keys()):
+        del st.session_state[k]
+
+def exigir_login(logo_html):
+    u = st.session_state.get('auth_user')
+    if not u:
+        st.markdown('<style>[data-testid="sidebar"], [data-testid="collapsedControl"]{display:none !important;}</style>', unsafe_allow_html=True)
+        _, centro, _ = st.columns([1, 1.2, 1])
+        with centro:
+            st.markdown('<br><br>', unsafe_allow_html=True)
+            st.markdown(f'<div class="brand">{logo_html}<div><div class="brand-name">I.E.S.P. G.J.F.S.M.</div><div class="brand-sub">Dirección de Gabinete Médico</div></div></div>', unsafe_allow_html=True)
+            st.markdown('### Acceso al sistema')
+            with st.form('sec_form_login'):
+                usuario = st.text_input('Usuario')
+                clave = st.text_input('Contraseña', type='password')
+                entrar = st.form_submit_button('Ingresar')
+            if entrar:
+                usr, msg = autenticar(usuario, clave)
+                if usr:
+                    st.session_state['auth_user'] = usr
+                    st.rerun()
+                else:
+                    st.error(msg)
+        st.stop()
+    if u.get('debe_cambiar_password'):
+        _, centro, _ = st.columns([1, 1.2, 1])
+        with centro:
+            st.markdown('### Debe cambiar su contraseña temporal')
+            with st.form('form_cambio_ini'):
+                npw = st.text_input('Nueva Contraseña (Mín. 10 caracteres)', type='password')
+                cpw = st.text_input('Confirmar Contraseña', type='password')
+                if st.form_submit_button('Actualizar'):
+                    if len(npw) >= 10 and npw == cpw:
+                        conn = _conn()
+                        conn.execute('UPDATE usuarios SET password_hash = ?, debe_cambiar_password = 0 WHERE id = ?', (hash_password(npw), u['id']))
+                        conn.commit()
+                        conn.close()
+                        st.session_state['auth_user']['debe_cambiar_password'] = 0
+                        st.success('Contraseña actualizada.')
+                        st.rerun()
+                    else:
+                        st.error('Verifique que tenga 10 caracteres y coincidan.')
+        st.stop()
+
+def render_sidebar_usuario():
+    u = st.session_state.get('auth_user')
+    if not u: return
+    st.sidebar.markdown(f'<div class="side-foot">👤 <b>{_html.escape(u["nombre_completo"])}</b><br>{_html.escape(u["rol"])}</div>', unsafe_allow_html=True)
+    if st.sidebar.button('🚪 Cerrar sesión', use_container_width=True):
+        cerrar_sesion()
+        st.rerun()
+
+def tiene_permiso(permiso):
+    rol = (st.session_state.get('auth_user') or {}).get('rol')
+    return rol in _PERMISOS_MATRIZ.get(permiso, set())
+
+def menu_disponible():
+    rol = (st.session_state.get('auth_user') or {}).get('rol')
+    return [m for m, p in MENU_PERMISOS.items() if rol in _PERMISOS_MATRIZ.get(p, set())]
+
+def autorizar_menu(menu):
+    permiso = MENU_PERMISOS.get(menu)
+    if permiso is None or tiene_permiso(permiso):
+        return True
+    st.error('⛔ Su rol no tiene acceso a este módulo.')
+    return False
+
+def exigir(permiso):
+    if tiene_permiso(permiso): return True
+    st.error('⛔ Sin permiso.')
+    return False
+
+def indice_profesional(nombres, df_personal):
+    return 0
+
+def pagina_usuarios():
+    st.markdown('<div class="pro-header"><p class="pro-title">👤 Gestión de Usuarios y Accesos</p><p class="pro-subtitle">Control de cuentas, asignación de roles, restablecimiento de contraseñas y activación.</p></div>', unsafe_allow_html=True)
+    t1, t2, t3 = st.tabs(['📋 Listado de Usuarios', '➕ Crear Nuevo Usuario', '🛠️ Administrar Cuenta'])
+    
+    with t1:
+        st.markdown('<br>', unsafe_allow_html=True)
+        conn = _conn()
+        df_u = pd.read_sql_query('SELECT id, username, nombre_completo, rol, activo, debe_cambiar_password FROM usuarios', conn)
+        conn.close()
+        st.dataframe(df_u, use_container_width=True)
+        
+    with t2:
+        st.markdown('<br>', unsafe_allow_html=True)
+        with st.form('form_crear_usu_admin', clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                u_nuevo = st.text_input('Nombre de Usuario *', placeholder='ej: jperez').strip().lower()
+                n_completo = st.text_input('Nombre y Apellido *', placeholder='ej: JUAN PÉREZ')
+                rol_nuevo = st.selectbox('Rol Asignado *', ROLES)
+            with c2:
+                auto_pw = st.checkbox('Generar contraseña temporal automáticamente', value=True)
+                p_nuevo = st.text_input('Contraseña (si no es autom.)', type='password')
+            
+            if st.form_submit_button('💾 Crear Cuenta de Usuario'):
+                pw_final = generar_password_temporal() if auto_pw else p_nuevo
+                if u_nuevo and n_completo:
+                    if not auto_pw and len(pw_final) < 10:
+                        st.warning('La contraseña debe tener al menos 10 caracteres.')
+                    else:
+                        try:
+                            conn = _conn()
+                            cur = conn.cursor()
+                            cur.execute('INSERT INTO usuarios (username, password_hash, nombre_completo, rol, activo, fecha_creacion, debe_cambiar_password) VALUES (?, ?, ?, ?, 1, ?, 1)',
+                                        (u_nuevo, hash_password(pw_final), n_completo, rol_nuevo, _ts()))
+                            conn.commit()
+                            conn.close()
+                            registrar_auditoria('Usuarios', 'INSERT', f'Creación de usuario {u_nuevo} (rol: {rol_nuevo})')
+                            st.success(f'¡Usuario «{u_nuevo}» creado con éxito!')
+                            if auto_pw:
+                                st.info(f'Contraseña temporal generada: **{pw_final}** (Anótela, no se volverá a mostrar).')
+                        except sqlite3.IntegrityError:
+                            st.error('El nombre de usuario ya existe en el sistema.')
+                else:
+                    st.warning('Complete los campos obligatorios (*).')
+                    
+    with t3:
+        st.markdown('<br>', unsafe_allow_html=True)
+        conn = _conn()
+        df_u = pd.read_sql_query('SELECT id, username, nombre_completo, rol, activo FROM usuarios', conn)
+        conn.close()
+        if df_u.empty:
+            st.info('No hay usuarios registrados.')
+        else:
+            dict_u = {r.id: f"{r.username} - {r.nombre_completo} ({r.rol})" for r in df_u.itertuples()}
+            uid_sel = st.selectbox('Seleccione Usuario', list(dict_u.keys()), format_func=lambda x: dict_u[x])
+            fila_u = df_u[df_u['id'] == uid_sel].iloc[0]
+            
+            c_a, c_b, c_c = st.columns(3)
+            with c_a:
+                st.markdown('**Cambiar Rol**')
+                nuevo_r = st.selectbox('Rol', ROLES, index=ROLES.index(fila_u['rol']) if fila_u['rol'] in ROLES else 0, key='sel_nuevo_rol')
+                if st.button('Actualizar Rol'):
+                    conn = _conn()
+                    conn.execute('UPDATE usuarios SET rol = ? WHERE id = ?', (nuevo_r, uid_sel))
+                    conn.commit()
+                    conn.close()
+                    registrar_auditoria('Usuarios', 'UPDATE', f'Cambio de rol para usuario ID {uid_sel} a {nuevo_r}', uid_sel)
+                    st.success('¡Rol actualizado con éxito!')
+                    st.rerun()
+            with c_b:
+                st.markdown('**Estado de Cuenta**')
+                estado_actual = bool(fila_u['activo'])
+                if estado_actual:
+                    if st.button('⛔ Desactivar Usuario'):
+                        conn = _conn()
+                        conn.execute('UPDATE usuarios SET activo = 0 WHERE id = ?', (uid_sel,))
+                        conn.commit()
+                        conn.close()
+                        registrar_auditoria('Usuarios', 'UPDATE', f'Desactivación de usuario ID {uid_sel}', uid_sel)
+                        st.success('Usuario desactivado.')
+                        st.rerun()
+                else:
+                    if st.button('✅ Activar Usuario'):
+                        conn = _conn()
+                        conn.execute('UPDATE usuarios SET activo = 1 WHERE id = ?', (uid_sel,))
+                        conn.commit()
+                        conn.close()
+                        registrar_auditoria('Usuarios', 'UPDATE', f'Activación de usuario ID {uid_sel}', uid_sel)
+                        st.success('Usuario activado.')
+                        st.rerun()
+            with c_c:
+                st.markdown('**Seguridad y Credenciales**')
+                if st.button('🔑 Restablecer Contraseña'):
+                    nueva_temp = generar_password_temporal()
+                    conn = _conn()
+                    conn.execute('UPDATE usuarios SET password_hash = ?, debe_cambiar_password = 1, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?', (hash_password(nueva_temp), uid_sel))
+                    conn.commit()
+                    conn.close()
+                    registrar_auditoria('Usuarios', 'UPDATE', f'Restablecimiento de contraseña para usuario ID {uid_sel}', uid_sel)
+                    st.success('¡Contraseña restablecida con éxito!')
+                    st.code(f'Nueva contraseña temporal: {nueva_temp}')
+
+def pagina_auditoria():
+    st.markdown('<div class="pro-header"><p class="pro-title">🛡️ Auditoría del Sistema</p><p class="pro-subtitle">Trazabilidad de accesos y operaciones críticas.</p></div>', unsafe_allow_html=True)
+    conn = _conn()
+    df = pd.read_sql_query('SELECT * FROM auditoria_logs ORDER BY id DESC LIMIT 100', conn)
+    conn.close()
+    st.dataframe(df, use_container_width=True)
