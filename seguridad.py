@@ -16,7 +16,7 @@ except Exception:
     TZ_LOCAL = timezone(timedelta(hours=-3))
 
 DB_NAME = 'gabinete_iesp.db'
-PBKDF2_ITERACIONES = 600_000
+PBKDF2_ITERACIONES = 600000
 MAX_INTENTOS = 5
 BLOQUEO_MINUTOS = 15
 TIMEOUT_SESION_MIN = 30
@@ -94,7 +94,7 @@ def validar_pdf(archivo):
     if archivo is None: return None
     datos = archivo.getbuffer()
     if len(datos) > MAX_PDF_BYTES:
-        st.error(f'«{archivo.name}» supera el límite.')
+        st.error('El archivo supera el límite.')
         return None
     return archivo
 
@@ -114,7 +114,7 @@ def verify_password(password, almacenado):
 def validar_politica_password(password, username=''):
     if len(password) < PASSWORD_MIN_LARGO:
         return f'La contraseña debe tener al menos {PASSWORD_MIN_LARGO} caracteres.'
-    if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
+    if not re.search(r'[A-Za-z]', password) or not re.search(r'[0-9]', password):
         return 'La contraseña debe combinar letras y números.'
     return None
 
@@ -135,7 +135,7 @@ def init_seguridad(db_name):
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         nombre_completo TEXT NOT NULL,
-        rol TEXT NOT NULL CHECK (rol IN ({roles_sql})),
+        rol TEXT NOT NULL,
         legajo_personal TEXT,
         activo INTEGER NOT NULL DEFAULT 1,
         fecha_creacion TEXT NOT NULL,
@@ -144,7 +144,7 @@ def init_seguridad(db_name):
         bloqueado_hasta TEXT
       )
     ''')
-    cur.execute(f'''
+    cur.execute('''
       CREATE TABLE IF NOT EXISTS auditoria_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fecha_hora TEXT NOT NULL,
@@ -184,7 +184,7 @@ def registrar_auditoria(modulo, accion, detalle, id_referencia=None):
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f'Error auditoria: {e}')
+        print(f"Error auditoria: {e}")
 
 def auditar_vista(modulo, detalle, id_referencia):
     clave = f'_aud_vista_{modulo}'
@@ -276,17 +276,20 @@ def exigir(permiso):
     st.error('⛔ Sin permiso.')
     return False
 
-def indice_profesional(nombres, df_personal): return 0
+def indice_profesional(nombres, df_personal):
+    return 0
 
 def pagina_usuarios():
     st.markdown('<div class="pro-header"><p class="pro-title">👤 Gestión de Usuarios y Accesos</p><p class="pro-subtitle">Control de cuentas, asignación de roles, restablecimiento de contraseñas y activación.</p></div>', unsafe_allow_html=True)
     t1, t2, t3 = st.tabs(['📋 Listado de Usuarios', '➕ Crear Nuevo Usuario', '🛠️ Administrar Cuenta'])
+    
     with t1:
         st.markdown('<br>', unsafe_allow_html=True)
         conn = _conn()
         df_u = pd.read_sql_query('SELECT id, username, nombre_completo, rol, activo, debe_cambiar_password FROM usuarios', conn)
         conn.close()
         st.dataframe(df_u, use_container_width=True)
+        
     with t2:
         st.markdown('<br>', unsafe_allow_html=True)
         with st.form('form_crear_usu_admin', clear_on_submit=True):
@@ -298,6 +301,7 @@ def pagina_usuarios():
             with c2:
                 auto_pw = st.checkbox('Generar contraseña temporal automáticamente', value=True)
                 p_nuevo = st.text_input('Contraseña (si no es autom.)', type='password')
+            
             if st.form_submit_button('💾 Crear Cuenta de Usuario'):
                 pw_final = generar_password_temporal() if auto_pw else p_nuevo
                 if u_nuevo and n_completo:
@@ -315,20 +319,22 @@ def pagina_usuarios():
                             st.success(f'¡Usuario «{u_nuevo}» creado con éxito!')
                             if auto_pw: st.info(f'Contraseña temporal: **{pw_final}**')
                         except sqlite3.IntegrityError:
-                            st.error('El nombre de usuario ya existe.')
+                            st.error('El nombre de usuario ya existe en el sistema.')
                 else:
                     st.warning('Complete los campos obligatorios (*).')
+                    
     with t3:
         st.markdown('<br>', unsafe_allow_html=True)
         conn = _conn()
         df_u = pd.read_sql_query('SELECT id, username, nombre_completo, rol, activo FROM usuarios', conn)
         conn.close()
         if df_u.empty:
-            st.info('No hay usuarios.')
+            st.info('No hay usuarios registrados.')
         else:
             dict_u = {r.id: f"{r.username} - {r.nombre_completo} ({r.rol})" for r in df_u.itertuples()}
             uid_sel = st.selectbox('Seleccione Usuario', list(dict_u.keys()), format_func=lambda x: dict_u[x])
             fila_u = df_u[df_u['id'] == uid_sel].iloc[0]
+            
             c_a, c_b, c_c = st.columns(3)
             with c_a:
                 st.markdown('**Cambiar Rol**')
@@ -338,19 +344,20 @@ def pagina_usuarios():
                     conn.execute('UPDATE usuarios SET rol = ? WHERE id = ?', (nuevo_r, uid_sel))
                     conn.commit()
                     conn.close()
-                    registrar_auditoria('Usuarios', 'UPDATE', f'Cambio de rol ID {uid_sel} a {nuevo_r}', uid_sel)
-                    st.success('¡Rol actualizado!')
+                    registrar_auditoria('Usuarios', 'UPDATE', f'Cambio de rol para usuario ID {uid_sel} a {nuevo_r}', uid_sel)
+                    st.success('¡Rol actualizado con éxito!')
                     st.rerun()
             with c_b:
-                st.markdown('**Estado**')
-                if bool(fila_u['activo']):
+                st.markdown('**Estado de Cuenta**')
+                estado_actual = bool(fila_u['activo'])
+                if estado_actual:
                     if st.button('⛔ Desactivar Usuario'):
                         conn = _conn()
                         conn.execute('UPDATE usuarios SET activo = 0 WHERE id = ?', (uid_sel,))
                         conn.commit()
                         conn.close()
-                        registrar_auditoria('Usuarios', 'UPDATE', f'Desactivación ID {uid_sel}', uid_sel)
-                        st.success('Desactivado.')
+                        registrar_auditoria('Usuarios', 'UPDATE', f'Desactivación de usuario ID {uid_sel}', uid_sel)
+                        st.success('Usuario desactivado.')
                         st.rerun()
                 else:
                     if st.button('✅ Activar Usuario'):
@@ -358,23 +365,23 @@ def pagina_usuarios():
                         conn.execute('UPDATE usuarios SET activo = 1 WHERE id = ?', (uid_sel,))
                         conn.commit()
                         conn.close()
-                        registrar_auditoria('Usuarios', 'UPDATE', f'Activación ID {uid_sel}', uid_sel)
-                        st.success('Activado.')
+                        registrar_auditoria('Usuarios', 'UPDATE', f'Activación de usuario ID {uid_sel}', uid_sel)
+                        st.success('Usuario activado.')
                         st.rerun()
             with c_c:
-                st.markdown('**Credenciales**')
+                st.markdown('**Seguridad y Credenciales**')
                 if st.button('🔑 Restablecer Contraseña'):
                     nueva_temp = generar_password_temporal()
                     conn = _conn()
                     conn.execute('UPDATE usuarios SET password_hash = ?, debe_cambiar_password = 1, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?', (hash_password(nueva_temp), uid_sel))
                     conn.commit()
                     conn.close()
-                    registrar_auditoria('Usuarios', 'UPDATE', f'Restablecimiento ID {uid_sel}', uid_sel)
-                    st.success('¡Contraseña restablecida!')
+                    registrar_auditoria('Usuarios', 'UPDATE', f'Restablecimiento de contraseña para usuario ID {uid_sel}', uid_sel)
+                    st.success('¡Contraseña restablecida con éxito!')
                     st.code(f'Nueva contraseña temporal: {nueva_temp}')
 
 def pagina_auditoria():
-    st.markdown('<div class="pro-header"><p class="pro-title">🛡️ Auditoría del Sistema</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="pro-header"><p class="pro-title">🛡️ Auditoría del Sistema</p><p class="pro-subtitle">Trazabilidad de accesos y operaciones críticas.</p></div>', unsafe_allow_html=True)
     conn = _conn()
     df = pd.read_sql_query('SELECT * FROM auditoria_logs ORDER BY id DESC LIMIT 100', conn)
     conn.close()
