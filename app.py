@@ -3,7 +3,10 @@ import os
 import sqlite3
 import pandas as pd
 import streamlit as st
+import html as _html
 import reportlab
+import seguridad as sec
+import analitica
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
@@ -365,6 +368,9 @@ def init_db():
       ('analisis_estudios', 'TEXT'),
       ('medicamentos', 'TEXT'),
       ('estado_alta', 'TEXT DEFAULT "Pendiente"'),
+      ('fecha_alta_efectiva', 'TEXT'),
+      ('medico_alta', 'TEXT'),
+      ('observaciones_alta', 'TEXT'),
   ]:
     try:
       cursor.execute(f'ALTER TABLE notas_medicas ADD COLUMN {col} {col_type};')
@@ -380,6 +386,7 @@ def init_db():
       ('presion', 'TEXT'),
       ('saturacion', 'TEXT'),
       ('derivacion', 'TEXT'),
+      ('temperatura', 'TEXT'),
   ]:
     try:
       cursor.execute(
@@ -451,7 +458,10 @@ def obtener_personal():
 
 
 def generar_pdf_legajo(cad_info, nota_info):
-  pdf_filename = f"Legajo_Medico_{cad_info['id_legajo']}.pdf"
+  pdf_filename = sec.nombre_seguro(
+      f"Legajo_Medico_{cad_info['id_legajo']}_{nota_info.get('nro_expediente', '')}.pdf",
+      unico=False,
+  )
   doc = SimpleDocTemplate(
       pdf_filename,
       pagesize=letter,
@@ -550,7 +560,7 @@ def generar_pdf_legajo(cad_info, nota_info):
               f"<b>Nro. Expediente:</b> {nota_info['nro_expediente']}",
               body_style,
           ),
-          Paragraph(f"<b>Fecha:</b> {str(datetime.today().date())}", body_style),
+          Paragraph(f"<b>Fecha:</b> {str(sec.ahora_local().date())}", body_style),
       ],
       [
           Paragraph(
@@ -620,6 +630,9 @@ _brand_logo = (
     if _logo_gab
     else '<div class="brand-logo">🛡️</div>'
 )
+sec.init_seguridad(DB_NAME)
+sec.exigir_login(_brand_logo)
+
 st.sidebar.markdown(
     f'<div class="brand">{_brand_logo}<div><div'
     ' class="brand-name">I.E.S.P. G.J.F.S.M.</div><div class="brand-sub">Dirección'
@@ -639,22 +652,13 @@ ICONOS_MENU = {
     '5. Historia Clínica Integral': '🗂️',
     '6. Examen de Baja / Egreso': '🚪',
     '7. Informes y Análisis de Datos (Spark)': '📈',
+    '8. Gestión de Usuarios': '👤',
+    '9. Auditoría del Sistema': '🛡️',
 }
 
 menu = st.sidebar.radio(
     'Navegación Principal',
-    [
-        'Dashboard General',
-        'Gestión de Legajos',
-        'Personal del Gabinete',
-        '1. Primera Intervención',
-        '2. Notas Médicas y Reposos',
-        '3. Control de Alta',
-        '4. Exámenes Periódicos y Anuales',
-        '5. Historia Clínica Integral',
-        '6. Examen de Baja / Egreso',
-        '7. Informes y Análisis de Datos (Spark)',
-    ],
+    sec.menu_disponible(),
     format_func=lambda x: f"{ICONOS_MENU.get(x, '•')}  {x}",
     label_visibility='collapsed',
 )
@@ -663,6 +667,9 @@ st.sidebar.markdown(
     ' exclusivo del personal autorizado.</div>',
     unsafe_allow_html=True,
 )
+sec.render_sidebar_usuario()
+if not sec.autorizar_menu(menu):
+  st.stop()
 
 DIAS_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
@@ -780,7 +787,7 @@ if menu == 'Dashboard General':
       ' Policía de Tucumán</div></div></div><div'
       ' class="hero-right"><div class="chip"><span class="dot"></span>Sistema'
       ' operativo</div>'
-      f'<div class="hero-date">{fecha_larga_es(datetime.today().date())}</div>'
+      f'<div class="hero-date">{fecha_larga_es(sec.ahora_local().date())}</div>'
       '</div></div>',
       unsafe_allow_html=True,
   )
@@ -826,7 +833,7 @@ if menu == 'Dashboard General':
   with dash_tab1:
     from html import escape as _esc
 
-    hoy = datetime.today().date()
+    hoy = sec.ahora_local().date()
     alertas = construir_alertas(df_n, df_e, df_i, hoy)
     n_crit = sum(1 for a in alertas if a['nivel'] == 0)
     n_warn = sum(1 for a in alertas if a['nivel'] == 1)
@@ -912,6 +919,8 @@ if menu == 'Dashboard General':
             df_alertas.to_csv(index=False).encode('utf-8-sig'),
             file_name=f'alertas_{hoy}.csv',
             mime='text/csv',
+            on_click=sec.registrar_auditoria,
+            args=('Dashboard', 'EXPORT', f'Descarga CSV de alertas ({len(df_alertas)} filas)'),
         )
 
     with col_der:
@@ -1027,9 +1036,9 @@ elif menu == 'Gestión de Legajos':
       busqueda = st.text_input('🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo/Cargo', placeholder='Escriba para filtrar...')
     with col_t2:
       st.markdown('<div style="margin-top: 1.8rem;"></div>', unsafe_allow_html=True)
-      if st.button('🔄 Sincronizar con Excel'):
+      if st.button('🔄 Sincronizar con Excel', disabled=not sec.tiene_permiso('sincronizar_excel')) and sec.exigir('sincronizar_excel'):
         ex, ms = importar_excel_directo()
-        if ex: st.success(ms); st.rerun()
+        if ex: sec.registrar_auditoria('Legajos', 'INSERT', f'Sincronización con Excel: {ms}'); st.success(ms); st.rerun()
         else: st.error(ms)
         
     df_cadetes = obtener_cadetes()
@@ -1041,21 +1050,29 @@ elif menu == 'Gestión de Legajos':
             | df_cadetes['dni'].astype(str).str.contains(busqueda, case=False, na=False)
         ]
       
+      if not sec.tiene_permiso('ver_legajos_completo'):
+        df_cadetes = df_cadetes[['id_legajo', 'apellido_nombre', 'curso']]
       st.markdown('<div class="panel">', unsafe_allow_html=True)
       st.dataframe(df_cadetes, use_container_width=True)
       st.markdown('</div>', unsafe_allow_html=True)
       
-      # Descarga CSV
-      st.download_button(
-          '⬇️ Descargar listado completo (CSV)',
-          df_cadetes.to_csv(index=False).encode('utf-8-sig'),
-          file_name=f'cadetes_iesp_{datetime.today().date()}.csv',
-          mime='text/csv',
-      )
+      # Descarga CSV (solo roles con permiso de exportación)
+      if sec.tiene_permiso('exportar_legajos'):
+        st.download_button(
+            '⬇️ Descargar listado completo (CSV)',
+            df_cadetes.to_csv(index=False).encode('utf-8-sig'),
+            file_name=f'cadetes_iesp_{sec.ahora_local().date()}.csv',
+            mime='text/csv',
+            on_click=sec.registrar_auditoria,
+            args=('Legajos', 'EXPORT', f'Descarga CSV del listado de cadetes ({len(df_cadetes)} filas)'),
+        )
     else:
       st.warning('No hay cadetes en la base de datos.')
       
   with tab2:
+    if not sec.tiene_permiso('alta_cadete'):
+      st.info('Su rol no permite registrar nuevos legajos.')
+      st.stop()
     st.markdown('<br>', unsafe_allow_html=True)
     st.markdown('<div class="panel"><h3>Formulario de Alta Manual de Cadete</h3><p style="color: var(--muted); font-size: 0.88rem;">Complete los datos obligatorios para incorporar un nuevo legajo al sistema institucional.</p></div>', unsafe_allow_html=True)
     
@@ -1073,7 +1090,7 @@ elif menu == 'Gestión de Legajos':
       observaciones = st.text_area('Observaciones / Contacto / Antecedentes Sanitarios', placeholder='Email, celular, grupo sanguíneo, etc.')
       
       st.markdown('<br>', unsafe_allow_html=True)
-      if st.form_submit_button('💾 Guardar Legajo Institucional'):
+      if st.form_submit_button('💾 Guardar Legajo Institucional') and sec.exigir('alta_cadete'):
         if id_legajo and apellido_nombre:
           try:
             conn = sqlite3.connect(DB_NAME)
@@ -1092,6 +1109,7 @@ elif menu == 'Gestión de Legajos':
             )
             conn.commit()
             conn.close()
+            sec.registrar_auditoria('Legajos', 'INSERT', f'Alta de cadete legajo {id_legajo} (curso {curso})', id_legajo)
             st.success(f'¡Legajo {id_legajo} de {apellido_nombre} guardado con éxito!')
           except sqlite3.IntegrityError:
             st.error('Error: El número de legajo ya existe en la base de datos.')
@@ -1130,6 +1148,9 @@ elif menu == 'Personal del Gabinete':
       st.info('No hay personal del gabinete registrado todavía.')
       
   with tab_p2:
+    if not sec.tiene_permiso('gestionar_personal'):
+      st.info('Solo los administradores pueden dar de alta o baja al personal.')
+      st.stop()
     st.markdown('<br>', unsafe_allow_html=True)
     st.markdown('<div class="panel"><h3>Registro de Nuevo Profesional</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese la información requerida, matrícula y el cargo o especialidad institucional.</p></div>', unsafe_allow_html=True)
     
@@ -1145,17 +1166,19 @@ elif menu == 'Personal del Gabinete':
         tel_pers = st.text_input('Teléfono de Contacto', placeholder='Ej: 3816545454').strip()
         
       st.markdown('<br>', unsafe_allow_html=True)
-      if st.form_submit_button('💾 Registrar Profesional en Staff'):
+      if st.form_submit_button('💾 Registrar Profesional en Staff') and sec.exigir('gestionar_personal'):
         if leg_pers and ap_nom_pers and mat_pers and esp_pers:
           try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
+            _existia = cursor.execute('SELECT 1 FROM personal_gabinete WHERE id_legajo_personal = ?', (leg_pers,)).fetchone() is not None
             cursor.execute(
                 'INSERT OR REPLACE INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)',
                 (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers),
             )
             conn.commit()
             conn.close()
+            sec.registrar_auditoria('Personal', 'UPDATE' if _existia else 'INSERT', f'{"Actualización" if _existia else "Alta"} de profesional {leg_pers}', leg_pers)
             st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
             st.rerun()
           except sqlite3.OperationalError as e:
@@ -1169,6 +1192,7 @@ elif menu == 'Personal del Gabinete':
               cursor.execute('INSERT OR REPLACE INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)', (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers))
               conn.commit()
               conn.close()
+              sec.registrar_auditoria('Personal', 'INSERT', f'Alta/actualización de profesional {leg_pers} (reparación de tabla)', leg_pers)
               st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
               st.rerun()
             except Exception as ex:
@@ -1192,13 +1216,14 @@ elif menu == 'Personal del Gabinete':
       with st.form('form_baja_personal'):
         sel_del = st.selectbox('Seleccione el Profesional', lista_del)
         st.markdown('<br>', unsafe_allow_html=True)
-        if st.form_submit_button('🗑️ Confirmar Baja del Staff'):
+        if st.form_submit_button('🗑️ Confirmar Baja del Staff') and sec.exigir('gestionar_personal'):
           id_elim = sel_del.split(' - ')[0]
           conn = sqlite3.connect(DB_NAME)
           cursor = conn.cursor()
           cursor.execute('DELETE FROM personal_gabinete WHERE id_legajo_personal = ?', (id_elim,))
           conn.commit()
           conn.close()
+          sec.registrar_auditoria('Personal', 'DELETE', f'Baja de profesional {id_elim}', id_elim)
           st.success('¡Personal dado de baja correctamente!')
           st.rerun()
 
@@ -1238,10 +1263,11 @@ elif menu == '1. Primera Intervención':
     with st.form('form_intervencion'):
       col1, col2 = st.columns(2)
       with col1:
-        hora_arg = (datetime.utcnow() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
+        hora_arg = sec.ahora_local().strftime('%Y-%m-%d %H:%M')
         fecha_hora = st.text_input('Fecha y Hora', value=hora_arg)
         profesional_atiende = st.selectbox(
-            'Profesional que Atiende*', lista_profesionales
+            'Profesional que Atiende*', lista_profesionales,
+            index=sec.indice_profesional(lista_profesionales, df_personal),
         )
         sintomas = st.text_area('Síntomas / Motivo*')
       with col2:
@@ -1261,7 +1287,7 @@ elif menu == '1. Primera Intervención':
             ],
         )
         derivacion_detalles = st.text_input('Detalles específicos')
-      if st.form_submit_button('Registrar Intervención'):
+      if st.form_submit_button('Registrar Intervención') and sec.exigir('primera_intervencion'):
         if profesional_atiende and sintomas and derivacion:
           derivacion_final = (
               f'{derivacion} - {derivacion_detalles}'
@@ -1275,7 +1301,7 @@ elif menu == '1. Primera Intervención':
             cursor.execute(
                 'INSERT INTO primera_intervencion (id_legajo, fecha_hora,'
                 ' profesional_atiende, sintomas, presion, saturacion,'
-                ' derivacion) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                ' derivacion, temperatura) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 (
                     id_legajo,
                     fecha_hora,
@@ -1284,9 +1310,11 @@ elif menu == '1. Primera Intervención':
                     presion,
                     saturacion,
                     derivacion_final,
+                    temperatura,
                 ),
             )
             conn.commit()
+            nuevo_id = cursor.lastrowid
             guardado = True
           except sqlite3.OperationalError as e:
             st.error(f'Error de base de datos: {e}')
@@ -1300,6 +1328,7 @@ elif menu == '1. Primera Intervención':
           finally:
             conn.close()
           if guardado:
+            sec.registrar_auditoria('Primera Intervención', 'INSERT', f'Intervención #{nuevo_id} (derivación: {derivacion})', id_legajo)
             st.success('¡Intervención registrada!')
             st.rerun()
         else:
@@ -1353,8 +1382,8 @@ elif menu == '2. Notas Médicas y Reposos':
             ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'],
         )
       with col2:
-        fecha_desde = st.date_input('Reposo Desde', value=datetime.today().date())
-        fecha_hasta = st.date_input('Reposo Hasta', value=datetime.today().date())
+        fecha_desde = st.date_input('Reposo Desde', value=sec.ahora_local().date())
+        fecha_hasta = st.date_input('Reposo Hasta', value=sec.ahora_local().date())
         certificados_indicaciones = st.text_area(
             'Certificados e Indicaciones Médicas'
         )
@@ -1369,8 +1398,9 @@ elif menu == '2. Notas Médicas y Reposos':
         ' escaneado)',
         type=['pdf'],
     )
+    uploaded_file = sec.validar_pdf(uploaded_file)
 
-    if submitted_nota:
+    if submitted_nota and sec.exigir('notas_medicas'):
       if nro_expediente and medico and diagnostico:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
@@ -1413,14 +1443,15 @@ elif menu == '2. Notas Médicas y Reposos':
                 id_legajo,
                 f'Expediente {nro_expediente} - Nota Médica y Certificado',
                 'PDF Oficial',
-                str(datetime.today().date()),
+                str(sec.ahora_local().date()),
                 pdf_path,
                 'Generado automáticamente',
             ),
         )
         if uploaded_file is not None:
           ext_path = os.path.join(
-              UPLOAD_DIR, f'{id_legajo}_{nro_expediente}_{uploaded_file.name}'
+              UPLOAD_DIR,
+              sec.nombre_seguro(f'{id_legajo}_{nro_expediente}_{uploaded_file.name}'),
           )
           with open(ext_path, 'wb') as f_ext:
             f_ext.write(uploaded_file.getbuffer())
@@ -1432,13 +1463,17 @@ elif menu == '2. Notas Médicas y Reposos':
                   id_legajo,
                   f'Expediente {nro_expediente} - Archivo Externo Adjunto',
                   'PDF Externo',
-                  str(datetime.today().date()),
+                  str(sec.ahora_local().date()),
                   ext_path,
                   'Subido por usuario',
               ),
           )
         conn.commit()
         conn.close()
+        sec.registrar_auditoria('Notas Médicas', 'INSERT', f'Nota médica / expediente {nro_expediente} ({tipo_reposo}, {fecha_desde} a {fecha_hasta})', id_legajo)
+        sec.registrar_auditoria('Documentos', 'INSERT', f'PDF oficial generado: {os.path.basename(pdf_path)} (exp. {nro_expediente})', id_legajo)
+        if uploaded_file is not None:
+          sec.registrar_auditoria('Documentos', 'INSERT', f'PDF externo subido: {os.path.basename(ext_path)} (exp. {nro_expediente})', id_legajo)
         st.success(
             '¡Nota médica y documentación PDF anexadas con éxito al legajo'
             ' digital!'
@@ -1496,30 +1531,42 @@ elif menu == '3. Control de Alta':
         col_a1, col_a2 = st.columns(2, gap='medium')
         with col_a1:
           medico_alta = st.text_input('Médico Tratante / Matrícula que otorga el Alta *', placeholder='Ej: Dr. Gómez / MP-4521').strip()
-          fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=datetime.today().date())
+          fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=sec.ahora_local().date())
         with col_a2:
           observaciones_alta = st.text_area('Observaciones Clínicas de Alta / Aptitud', placeholder='Paciente recuperado, sin secuelas, apto para retomar actividades.')
         
         uploaded_alta_pdf = st.file_uploader('📎 Adjuntar Certificado de Alta Médico (PDF)', type=['pdf'], key='up_alta_pdf')
+        uploaded_alta_pdf = sec.validar_pdf(uploaded_alta_pdf)
         
         st.markdown('<br>', unsafe_allow_html=True)
-        if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Archivar'):
+        if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Archivar') and sec.exigir('control_alta'):
           if medico_alta:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            cursor.execute("UPDATE notas_medicas SET estado_alta = 'Alta Convalidada' WHERE id = ?", (exp_id,))
+            cursor.execute(
+                "UPDATE notas_medicas SET estado_alta = 'Alta Convalidada', fecha_alta_efectiva = ?,"
+                " medico_alta = ?, observaciones_alta = ? WHERE id = ? AND estado_alta = 'Pendiente'",
+                (str(fecha_alta_efectiva), medico_alta, observaciones_alta, exp_id),
+            )
+            _alta_aplicada = cursor.rowcount > 0
             
-            if uploaded_alta_pdf is not None:
-              alta_path = os.path.join(UPLOAD_DIR, f"{exp_row['id_legajo']}_ALTA_{exp_row['nro_expediente']}_{uploaded_alta_pdf.name}")
+            if uploaded_alta_pdf is not None and _alta_aplicada:
+              alta_path = os.path.join(UPLOAD_DIR, sec.nombre_seguro(f"{exp_row['id_legajo']}_ALTA_{exp_row['nro_expediente']}_{uploaded_alta_pdf.name}"))
               with open(alta_path, 'wb') as f_al:
                 f_al.write(uploaded_alta_pdf.getbuffer())
               cursor.execute('INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
-                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta Médica", 'PDF Alta', str(datetime.today().date()), alta_path, f"Médico: {medico_alta} | {observaciones_alta}"))
+                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta Médica", 'PDF Alta', str(sec.ahora_local().date()), alta_path, f"Médico: {medico_alta} | {observaciones_alta}"))
             
             conn.commit()
             conn.close()
-            st.success('¡Alta médica convalidada y certificado PDF archivado con éxito en el legajo!')
-            st.rerun()
+            if _alta_aplicada:
+              sec.registrar_auditoria('Control de Alta', 'UPDATE', f"Alta convalidada exp. {exp_row['nro_expediente']} (fecha efectiva {fecha_alta_efectiva}; estado Pendiente → Alta Convalidada)", exp_row['id_legajo'])
+              if uploaded_alta_pdf is not None:
+                sec.registrar_auditoria('Documentos', 'INSERT', f"Certificado de alta PDF subido: {os.path.basename(alta_path)} (exp. {exp_row['nro_expediente']})", exp_row['id_legajo'])
+              st.success('¡Alta médica convalidada y certificado PDF archivado con éxito en el legajo!')
+              st.rerun()
+            else:
+              st.warning('Este expediente ya no figura como pendiente (¿ya fue convalidado?). Actualice la página.')
           else:
             st.warning('Debe completar el nombre o matrícula del médico que otorga el alta.')
     else:
@@ -1563,7 +1610,7 @@ elif menu == '3. Control de Alta':
         with col_e2:
           nueva_fecha_hasta = st.date_input(
               'Nueva Fecha de Finalización de Reposo',
-              value=datetime.today().date() + timedelta(days=7),
+              value=sec.ahora_local().date() + timedelta(days=7),
           )
           nuevos_certificados = st.text_area(
               '📄 Observaciones del Nuevo Certificado Presentado'
@@ -1574,30 +1621,32 @@ elif menu == '3. Control de Alta':
             type=['pdf'],
             key='up_ext',
         )
+        uploaded_ext = sec.validar_pdf(uploaded_ext)
 
-        if st.form_submit_button('Registrar Prórroga y Extender Reposo'):
+        if st.form_submit_button('Registrar Prórroga y Extender Reposo') and sec.exigir('control_alta'):
           if nuevo_medico and nuevo_diagnostico:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
+            _prev = cursor.execute(
+                "SELECT fecha_hasta, medicamentos FROM notas_medicas WHERE id_legajo = ?"
+                " AND nro_expediente = ? AND estado_alta = 'Pendiente'",
+                (id_leg_ext, exp_ref),
+            ).fetchone()
+            _fecha_ant = _prev[0] if _prev else 'N/D'
+            # La prórroga se ANEXA a medicamentos (antes se sobrescribía y se perdía la prescripción).
+            _nota_prorroga = f'Prórroga de {dias_adicionales} días. Motivo: {nuevo_diagnostico}'
+            _med_nuevo = f'{_prev[1]} | {_nota_prorroga}' if _prev and _prev[1] else _nota_prorroga
             cursor.execute(
                 'UPDATE notas_medicas SET fecha_hasta = ?, medicamentos = ?'
-                ' WHERE id_legajo = ? AND nro_expediente = ? AND estado_alta ='
-                " 'Pendiente'",
-                (
-                    str(nueva_fecha_hasta),
-                    (
-                        f'Prórroga de {dias_adicionales} días. Motivo:'
-                        f' {nuevo_diagnostico}'
-                    ),
-                    id_leg_ext,
-                    exp_ref,
-                ),
+                " WHERE id_legajo = ? AND nro_expediente = ? AND estado_alta = 'Pendiente'",
+                (str(nueva_fecha_hasta), _med_nuevo, id_leg_ext, exp_ref),
             )
+            _prorroga_aplicada = cursor.rowcount > 0
 
-            if uploaded_ext is not None:
+            if uploaded_ext is not None and _prorroga_aplicada:
               ext_path = os.path.join(
                   UPLOAD_DIR,
-                  f'{id_leg_ext}_PRORROGA_{uploaded_ext.name}',
+                  sec.nombre_seguro(f'{id_leg_ext}_PRORROGA_{uploaded_ext.name}'),
               )
               with open(ext_path, 'wb') as f_ex:
                 f_ex.write(uploaded_ext.getbuffer())
@@ -1609,18 +1658,21 @@ elif menu == '3. Control de Alta':
                       id_leg_ext,
                       f'Expediente {exp_ref} - Prórroga de Reposo',
                       'PDF Prórroga',
-                      str(datetime.today().date()),
+                      str(sec.ahora_local().date()),
                       ext_path,
                       nuevo_diagnostico,
                   ),
               )
             conn.commit()
             conn.close()
-            st.success(
-                '¡Prórroga de reposo registrada y legajo actualizado'
-                ' correctamente!'
-            )
-            st.rerun()
+            if _prorroga_aplicada:
+              sec.registrar_auditoria('Control de Alta', 'UPDATE', f'Prórroga exp. {exp_ref}: fin de reposo {_fecha_ant} → {nueva_fecha_hasta} (+{dias_adicionales} días)', id_leg_ext)
+              if uploaded_ext is not None:
+                sec.registrar_auditoria('Documentos', 'INSERT', f'PDF de prórroga subido: {os.path.basename(ext_path)} (exp. {exp_ref})', id_leg_ext)
+              st.success('¡Prórroga de reposo registrada y legajo actualizado correctamente!')
+              st.rerun()
+            else:
+              st.warning('El expediente ya no figura como pendiente; no se aplicó la prórroga. Actualice la página.')
           else:
             st.warning('Complete campos obligatorios (*).')
     else:
@@ -1661,7 +1713,7 @@ elif menu == '4. Exámenes Periódicos y Anuales':
             if es_femenino
             else 'N/A'
         )
-      if st.form_submit_button('Guardar Exámenes'):
+      if st.form_submit_button('Guardar Exámenes') and sec.exigir('examenes_periodicos'):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute(
@@ -1677,11 +1729,12 @@ elif menu == '4. Exámenes Periódicos y Anuales':
                 electro,
                 aptitud,
                 beta_hcg,
-                str(datetime.today()),
+                str(sec.ahora_local()),
             ),
         )
         conn.commit()
         conn.close()
+        sec.registrar_auditoria('Exámenes Periódicos', 'INSERT', 'Examen periódico anual registrado', id_legajo)
         st.success('¡Exámenes guardados con éxito!')
 
 elif menu == '5. Historia Clínica Integral':
@@ -1714,39 +1767,40 @@ elif menu == '5. Historia Clínica Integral':
       ).tolist()
       seleccion_hc = st.selectbox('Seleccione el Cadete de la Lista', lista_hc)
       id_leg_hc = seleccion_hc.split(' - ')[0]
+      sec.auditar_vista('Historia Clínica', 'Consulta de historia clínica', id_leg_hc)
       cad_hc = df_cadetes[
           df_cadetes['id_legajo'].astype(str) == id_leg_hc
       ].iloc[0]
       st.markdown(
           '<div class="profile-card"><h2>'
-          + str(cad_hc['apellido_nombre'])
+          + _html.escape(str(cad_hc['apellido_nombre']))
           + '</h2><p>Legajo: <b>'
-          + str(cad_hc['id_legajo'])
+          + _html.escape(str(cad_hc['id_legajo']))
           + '</b> | Curso: <b>'
-          + str(cad_hc['curso'])
+          + _html.escape(str(cad_hc['curso']))
           + '</b> | DNI: <b>'
-          + str(cad_hc['dni'])
+          + _html.escape(str(cad_hc['dni']))
           + '</b></p></div>',
           unsafe_allow_html=True,
       )
       conn = sqlite3.connect(DB_NAME)
       df_nm_hc = pd.read_sql_query(
-          f"SELECT * FROM notas_medicas WHERE id_legajo = '{id_leg_hc}'", conn
+          'SELECT * FROM notas_medicas WHERE id_legajo = ?', conn, params=(id_leg_hc,)
       )
       df_doc_hc = pd.read_sql_query(
-          f"SELECT * FROM legajo_documentos WHERE id_legajo = '{id_leg_hc}'", conn
+          'SELECT * FROM legajo_documentos WHERE id_legajo = ?', conn, params=(id_leg_hc,)
       )
       conn.close()
       st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
       if not df_nm_hc.empty:
         for _, r in df_nm_hc.iterrows():
-          exp_no = str(r['nro_expediente'])
-          diag = str(r['diagnostico'])
-          med = str(r['medico'])
-          rep = str(r['tipo_reposo'])
-          f_des = str(r['fecha_desde'])
-          f_has = str(r['fecha_hasta'])
-          est = str(r['estado_alta'])
+          exp_no = _html.escape(str(r['nro_expediente']))
+          diag = _html.escape(str(r['diagnostico']))
+          med = _html.escape(str(r['medico']))
+          rep = _html.escape(str(r['tipo_reposo']))
+          f_des = _html.escape(str(r['fecha_desde']))
+          f_has = _html.escape(str(r['fecha_hasta']))
+          est = _html.escape(str(r['estado_alta']))
           cert_ind = (
               str(r['certificados_indicaciones'])
               if pd.notna(r['certificados_indicaciones'])
@@ -1757,6 +1811,8 @@ elif menu == '5. Historia Clínica Integral':
               if pd.notna(r['analisis_estudios'])
               else 'Sin estudios'
           )
+          cert_ind = _html.escape(cert_ind)
+          an_est = _html.escape(an_est)
           card_html = (
               '<div class="profile-card" style="border-left: 4px solid #38BDF8;">'
               '<h4>Expediente: '
@@ -1798,6 +1854,8 @@ elif menu == '5. Historia Clínica Integral':
                   file_name=f_path,
                   mime='application/pdf',
                   key=f'dl_{doc_id}',
+                  on_click=sec.registrar_auditoria,
+                  args=('Documentos', 'EXPORT', f'Descarga de PDF: {os.path.basename(f_path)}', id_leg_hc),
               )
       else:
         st.info('No hay documentos PDF en el legajo digital todavía.')
@@ -1821,16 +1879,17 @@ elif menu == '6. Examen de Baja / Egreso':
           'Motivo', ['Egreso', 'Baja Voluntaria', 'Baja Médica']
       )
       estado = st.text_area('Estado de Salud al Egreso')
-      if st.form_submit_button('Guardar Baja'):
+      if st.form_submit_button('Guardar Baja') and sec.exigir('examen_baja'):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute(
             'INSERT INTO examen_baja (id_legajo, fecha_baja, motivo,'
             ' estado_salud_egreso, observaciones_medicas) VALUES (?, ?, ?, ?, ?)',
-            (id_legajo, str(datetime.today().date()), motivo, estado, ''),
+            (id_legajo, str(sec.ahora_local().date()), motivo, estado, ''),
         )
         conn.commit()
         conn.close()
+        sec.registrar_auditoria('Examen de Baja', 'INSERT', f'Examen de baja registrado (motivo: {motivo})', id_legajo)
         st.success('¡Baja registrada con éxito!')
 
 elif menu == '7. Informes y Análisis de Datos (Spark)':
@@ -1870,11 +1929,12 @@ elif menu == '7. Informes y Análisis de Datos (Spark)':
     st.markdown(kpi_card('⏳', pend_count, 'Altas pendientes', '#FBBF24', 'Sin convalidar'), unsafe_allow_html=True)
 
   st.markdown('<br>', unsafe_allow_html=True)
-  spark_tab1, spark_tab2, spark_tab3, spark_tab4 = st.tabs([
+  spark_tab1, spark_tab2, spark_tab3, spark_tab4, spark_tab5 = st.tabs([
       '📈 Morbilidad y Diagnósticos',
       '🏥 Guardia y Derivaciones',
       '⏳ Tiempos y Reposos',
       '🧪 Prevención y Anuales',
+      '🔬 Análisis Avanzado',
   ])
 
   with spark_tab1:
@@ -1959,5 +2019,15 @@ elif menu == '7. Informes y Análisis de Datos (Spark)':
       st.dataframe(df_e_rep, use_container_width=True)
     else:
       st.info('No hay exámenes periódicos registrados todavía.')
+
+  with spark_tab5:
+    analitica.render(DB_NAME)
+
+elif menu == '8. Gestión de Usuarios':
+  sec.pagina_usuarios()
+
+elif menu == '9. Auditoría del Sistema':
+  sec.pagina_auditoria()
+
 else:
   st.markdown(f'## Módulo: {menu}')
