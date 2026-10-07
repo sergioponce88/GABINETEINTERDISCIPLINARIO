@@ -792,7 +792,7 @@ elif menu == '4. Exámenes Periódicos y Anuales':
 
 elif menu == '5. Historia Clínica Integral':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">📁 Legajo e Historia Clínica Integral</p><p class="pro-subtitle">Informe consolidado por cadete, filtrado por año o histórico, con opciones de edición/eliminación y exportación a PDF oficial.</p></div>',
+      '<div class="pro-header"><p class="pro-title">📁 Legajo e Historia Clínica Integral</p><p class="pro-subtitle">Informe consolidado por cadete, filtrado por año o histórico, con opciones de edición/eliminación segura y exportación a PDF oficial.</p></div>',
       unsafe_allow_html=True,
   )
   df_cadetes = obtener_cadetes()
@@ -902,14 +902,30 @@ elif menu == '5. Historia Clínica Integral':
                   st.success("¡Nota médica actualizada con éxito!")
                   st.rerun()
           with col_btn2:
-            if st.button(f"🗑️ Eliminar Nota Expediente {r['nro_expediente']} (ID: {nota_id})", key=f"btn_del_n_{nota_id}") and sec.exigir('notas_medicas'):
-              conn = sqlite3.connect(DB_NAME)
-              conn.execute("DELETE FROM notas_medicas WHERE id = ?", (nota_id,))
-              conn.commit()
-              conn.close()
-              sec.registrar_auditoria('Notas Médicas', 'DELETE', f"Eliminación de nota ID {nota_id} por error de carga", id_leg_hc)
-              st.success("¡Nota médica eliminada correctamente!")
-              st.rerun()
+            with st.expander(f"🗑️ Eliminar Nota {r['nro_expediente']} (ID: {nota_id})"):
+              with st.form(f"form_del_nota_{nota_id}"):
+                st.warning("⚠️ Acción protegida. Ingrese su contraseña para confirmar la eliminación.")
+                pw_conf = st.text_input("Contraseña del usuario actual", type="password", key=f"pw_del_{nota_id}")
+                if st.form_submit_button("Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
+                  usr_actual = st.session_state.get('auth_user', {})
+                  if usr_actual:
+                    conn_v = sqlite3.connect(DB_NAME)
+                    conn_v.row_factory = sqlite3.Row
+                    u_db = conn_v.execute("SELECT * FROM usuarios WHERE username = ?", (usr_actual.get('username'),)).fetchone()
+                    conn_v.close()
+                    
+                    if u_db and sec.verify_password(pw_conf, u_db['password_hash']):
+                      conn = sqlite3.connect(DB_NAME)
+                      conn.execute("DELETE FROM notas_medicas WHERE id = ?", (nota_id,))
+                      conn.commit()
+                      conn.close()
+                      sec.registrar_auditoria('Notas Médicas', 'DELETE', f"Eliminación segura de nota ID {nota_id} con contraseña confirmada", id_leg_hc)
+                      st.success("¡Nota médica eliminada correctamente!")
+                      st.rerun()
+                    else:
+                      st.error("Contraseña incorrecta. No se pudo autorizar la eliminación.")
+                  else:
+                    st.error("Sesión no válida.")
           st.markdown('<hr style="border-color: #1C2740; margin: 1.5rem 0;">', unsafe_allow_html=True)
       else:
         st.info(f'No hay notas médicas registradas para el período ({anio_seleccionado}).')
