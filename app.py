@@ -27,6 +27,30 @@ def _buscar_logo(nombre):
           return os.path.join(carpeta, f)
   return None
 
+@st.cache_data(show_spinner=False)
+def logo_uri(nombre, alto=120):
+  ruta = _buscar_logo(nombre)
+  if not ruta:
+    return ''
+  try:
+    import base64
+    import io
+    from PIL import Image, ImageDraw, ImageFilter
+    im = Image.open(ruta).convert('RGBA')
+    m = im.getchannel('A').point(lambda a: 255 if a < 16 else 0)
+    if m.getpixel((0, 0)) == 255:
+      ImageDraw.floodfill(m, (0, 0), 128)
+      huecos = m.point(lambda v: 255 if v == 255 else 0).filter(ImageFilter.MaxFilter(5))
+      blanco = Image.new('RGBA', im.size, (255, 255, 255, 255))
+      im = Image.composite(Image.alpha_composite(blanco, im), im, huecos)
+    ancho = max(1, round(im.width * alto / im.height))
+    im = im.resize((ancho, alto), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, format='PNG', optimize=True)
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+  except Exception:
+    return ''
+
 try:
   from PIL import Image as _PILImage
   _ruta_icono = _buscar_logo('GABINETE.png')
