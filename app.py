@@ -73,12 +73,11 @@ st.markdown('''<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 :root {
   --bg: #05070D; --surface: #0C1220; --surface-2: #111A2E; --border: #1C2740;
-  --text: #E6EAF2; --muted: #94A3B8; --accent: #3B82F6; --accent-2: #22D3EE;
+  --text: #E6EAF2; --muted: #8A97B1; --accent: #3B82F6; --accent-2: #22D3EE;
   --ok: #10B981; --warn: #F59E0B; --crit: #EF4444; --info: #38BDF8;
 }
-html, body, [class*="css"], .stApp, button, input, textarea, select, label, p, span, div {
+html, body, [class*="css"], .stApp, button, input, textarea, select {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif !important;
-  color: var(--text) !important;
 }
 .stApp {
   background: radial-gradient(900px 400px at 85% -10%, rgba(59,130,246,0.10), transparent 60%),
@@ -88,52 +87,37 @@ html, body, [class*="css"], .stApp, button, input, textarea, select, label, p, s
 [data-testid="stHeader"] { background: transparent; }
 footer { visibility: hidden; }
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1400px; }
-
-/* Forzar títulos y textos importantes en blanco puro */
 h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
   color: #FFFFFF !important; font-weight: 800 !important;
 }
-p, span, label, div[data-testid="stMarkdownContainer"] {
-  color: var(--text) !important;
-}
-
-/* Forzar etiquetas secundarias y de formularios con buen contraste */
-label, .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInput label,
-.stTextArea label, .stNumberInput label {
-  color: #94A3B8 !important;
-  font-size: 0.78rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase;
-}
-
 [data-testid="stSidebar"] {
   background: linear-gradient(180deg, #0A1020 0%, #070B16 100%);
   border-right: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.2rem 1.1rem 0.2rem; border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }
 .brand-logo { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: linear-gradient(135deg, #2563EB, #22D3EE); box-shadow: 0 8px 24px rgba(37,99,235,0.45); }
-.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF !important; }
-.brand-sub { font-size: 0.74rem; color: var(--muted) !important; margin-top: 0.15rem; }
+.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF; }
+.brand-sub { font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; }
 .brand-logo.has-img { background: none; box-shadow: none; width: 54px; height: 58px; }
 .brand-logo img { width: 100%; height: 100%; object-fit: contain; }
 .nav-label { font-size: 0.68rem; font-weight: 700; color: #5F6C88; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }
-.side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px; font-size: 0.74rem; color: var(--muted) !important; background: rgba(17,26,46,0.6); }
-
+.side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px; font-size: 0.74rem; color: var(--muted); background: rgba(17,26,46,0.6); }
 .hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; padding: 2rem 2.2rem; border-radius: 22px; margin-bottom: 1.4rem; border: 1px solid #22305A; background: radial-gradient(600px 220px at 100% 0%, rgba(34,211,238,0.18), transparent 65%), radial-gradient(500px 260px at 0% 100%, rgba(99,102,241,0.25), transparent 65%), linear-gradient(135deg, #0B1330 0%, #121B45 100%); }
 .kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }
 .kpi-icon { flex: 0 0 auto; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; font-size: 1.45rem; background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
-.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF !important; }
-.kpi-label { font-size: 0.72rem; font-weight: 700; color: var(--muted) !important; text-transform: uppercase; }
-.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem; background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); color: var(--text); }
+.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF; }
+.kpi-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem; background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }
 .pro-header { background: linear-gradient(135deg, #0B1330 0%, #121B45 100%); padding: 2rem; border-radius: 20px; border: 1px solid #22305A; color: white; margin-bottom: 1.5rem; }
-.pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF !important; }
-.pro-subtitle { font-size: 1rem; color: #93C5FD !important; margin-top: 0.4rem; }
-.profile-card { background: linear-gradient(135deg, #0F172A 0%, #111B33 100%); padding: 1.5rem 1.75rem; border-radius: 18px; border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; color: var(--text); }
+.pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF; }
+.pro-subtitle { font-size: 1rem; color: #93C5FD; margin-top: 0.4rem; }
+.profile-card { background: linear-gradient(135deg, #0F172A 0%, #111B33 100%); padding: 1.5rem 1.75rem; border-radius: 18px; border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; }
 
 /* Forzar legibilidad total y colores oscuros en todos los campos de texto e inputs de Streamlit */
 input, textarea, select, div[data-baseweb="select"] span, div[data-baseweb="select"] div, .stSelectbox div[data-baseweb="select"] {
   color: #FFFFFF !important;
   background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
 }
 .stTextInput input, .stTextArea textarea, .stDateInput input {
   color: #FFFFFF !important;
@@ -845,7 +829,41 @@ elif menu == '2. Notas Médicas y Reposos':
         conn.commit()
         conn.close()
         sec.registrar_auditoria('Notas Médicas', 'INSERT', f'Nota médica / expediente {nro_exp} registrado', id_leg)
-        st.success('✅ ¡Nota médica guardada con éxito y campos limpios!')
+        
+        # Generamos el texto institucional exacto para WhatsApp
+        hora_actual_str = sec.ahora_local().strftime('%H:%M')
+        fecha_actual_str = fecha_larga_es(sec.ahora_local().date())
+        usuario_que_informa = (st.session_state.get('auth_user') or {}).get('nombre_completo', 'Personal de Guardia')
+        
+        texto_wa = f"""🇦🇷 *Dirección de Gabinete Interdisciplinario de Asesoramiento Psicopedagógico y Psicológico* 🇦🇷
+➖➖➖➖➖➖➖➖
+🇦🇷 *GUARDIA MEDICA* 🇦🇷
+➖➖➖➖➖➖➖
+*FECHA:* {fecha_actual_str}
+ 
+_______________________
+*Ref.:* Nota Medica
+ 
+Para conocimiento de la Superioridad, en el día de la fecha, siendo horas {hora_actual_str} se hizo presente en el recinto de guardia el/la cadete de {cad_sel['curso']} {cad_sel['apellido_nombre']} (Legajo: {cad_sel['id_legajo']}) quien presenta certificado medico expedido por {med} en el cual diagnóstica {diag}, con reposo por {tipo_rep} a partir de la fecha (Expediente Nro: {nro_exp}).
+
+*Obs:* {cert if cert else 'Sin observaciones adicionales'}.
+
+➖➖➖➖➖➖➖➖
+*SUPERVISOR GENERAL:* 
+Comisario Correa María de los Angeles
+_*(Directora del D.G.I.A.P.P.")*_
+
+*INFORMA:*
+{usuario_que_informa}"""
+
+        st.success('✅ ¡Nota médica guardada con éxito, expediente generado y campos limpios!')
+        st.markdown('### 📱 Parte Institucional para WhatsApp')
+        st.info('Copie el siguiente texto o presione el botón para enviarlo directamente por WhatsApp.')
+        st.code(texto_wa, language='markdown')
+        
+        import urllib.parse
+        wa_link = f"https://wa.me/?text={urllib.parse.quote(texto_wa)}"
+        st.markdown(f'<a href="{wa_link}" target="_blank"><button style="background-color:#25D366; color:white; padding:0.6rem 1.4rem; border:none; border-radius:12px; font-weight:700; cursor:pointer; font-size:1rem;">💬 Enviar Parte por WhatsApp</button></a>', unsafe_allow_html=True)
       else:
         st.warning('Complete los campos obligatorios (*).')
 
@@ -1017,6 +1035,7 @@ elif menu == '5. Historia Clínica Integral':
                 if st.form_submit_button("Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
                   usr_actual = st.session_state.get('auth_user', {})
                   if usr_actual:
+                    # Validar contraseña contra la base de datos
                     conn_v = sqlite3.connect(DB_NAME)
                     conn_v.row_factory = sqlite3.Row
                     u_db = conn_v.execute("SELECT * FROM usuarios WHERE username = ?", (usr_actual.get('username'),)).fetchone()
