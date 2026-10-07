@@ -457,6 +457,118 @@ def obtener_personal():
   return df
 
 
+
+def generar_pdf_historia_clinica(cad_info, df_notas, df_intervenciones, anio_filtro=None):
+    pdf_filename = sec.nombre_seguro(f"Historia_Clinica_{cad_info['id_legajo']}_{anio_filtro if anio_filtro else 'Historica'}.pdf", unico=False)
+    doc = SimpleDocTemplate(pdf_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    normal_style = styles['Normal']
+    
+    title_style = ParagraphStyle('DocTitle', parent=normal_style, fontName='Helvetica-Bold', fontSize=14, leading=16, textColor=colors.HexColor('#1E3A8A'), alignment=1)
+    subtitle_style = ParagraphStyle('DocSubtitle', parent=normal_style, fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#64748B'), alignment=1)
+    section_heading = ParagraphStyle('SectionHeading', parent=normal_style, fontName='Helvetica-Bold', fontSize=10, leading=13, textColor=colors.HexColor('#1E3A8A'), spaceBefore=8, spaceAfter=3)
+    body_style = ParagraphStyle('BodyPro', parent=normal_style, fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#1F2937'))
+    
+    elements = []
+    elements.append(Paragraph("INSTITUTO DE ENSEÑANZA SUPERIOR DE POLICÍA", title_style))
+    elements.append(Paragraph("«Gral. José Francisco de San Martín»<br/>Dirección de Gabinete Interdisciplinario - Legajo Sanitario Integral", subtitle_style))
+    elements.append(Spacer(1, 10))
+    
+    cadet_info_data = [
+        [Paragraph(f"<b>Cadete:</b> {cad_info['apellido_nombre']}", body_style), Paragraph(f"<b>Legajo:</b> {cad_info['id_legajo']}", body_style)],
+        [Paragraph(f"<b>Curso:</b> {cad_info['curso']}", body_style), Paragraph(f"<b>DNI:</b> {cad_info['dni']}", body_style)],
+        [Paragraph(f"<b>Género:</b> {cad_info['genero']}", body_style), Paragraph(f"<b>Período:</b> {'Año ' + str(anio_filtro) if anio_filtro else 'Historial Completo'}", body_style)]
+    ]
+    t_cadet = Table(cadet_info_data, colWidths=[270, 270])
+    t_cadet.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E1')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING', (0,0), (-1,-1), 5)
+    ]))
+    elements.append(t_cadet)
+    elements.append(Spacer(1, 10))
+    
+    elements.append(Paragraph("1. NOTAS MÉDICAS Y REPOSOS", section_heading))
+    if not df_notas.empty:
+        if anio_filtro:
+            df_notas = df_notas[df_notas['fecha_desde'].astype(str).str.contains(str(anio_filtro), na=False)]
+        
+        if not df_notas.empty:
+            nota_table_data = [["Expediente", "Tipo / Fechas", "Diagnóstico / Médico", "Estado"]]
+            for _, r in df_notas.iterrows():
+                nota_table_data.append([
+                    Paragraph(str(r['nro_expediente']), body_style),
+                    Paragraph(f"{r['tipo_reposo']}<br/>{r['fecha_desde']} al {r['fecha_hasta']}", body_style),
+                    Paragraph(f"<b>{r['medico']}</b><br/>{r['diagnostico']}", body_style),
+                    Paragraph(str(r['estado_alta']), body_style)
+                ])
+            t_n = Table(nota_table_data, colWidths=[90, 110, 240, 100])
+            t_n.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 8.5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('PADDING', (0,0), (-1,-1), 4)
+            ]))
+            elements.append(t_n)
+        else:
+            elements.append(Paragraph("No hay notas médicas para el período seleccionado.", body_style))
+    else:
+        elements.append(Paragraph("Sin registros de notas médicas.", body_style))
+        
+    elements.append(Spacer(1, 10))
+    
+    elements.append(Paragraph("2. INTERVENCIONES DE GUARDIA Y ATENCIONES", section_heading))
+    if not df_intervenciones.empty:
+        if anio_filtro:
+            df_intervenciones = df_intervenciones[df_intervenciones['fecha_hora'].astype(str).str.contains(str(anio_filtro), na=False)]
+            
+        if not df_intervenciones.empty:
+            inter_table_data = [["Fecha / Hora", "Profesional", "Síntomas / Signos", "Derivación"]]
+            for _, r in df_intervenciones.iterrows():
+                signos = f"PA: {r.get('presion','-')} | SpO2: {r.get('saturacion','-')} | T: {r.get('temperatura','-')}°C"
+                inter_table_data.append([
+                    Paragraph(str(r['fecha_hora']), body_style),
+                    Paragraph(str(r['profesional_atiende']), body_style),
+                    Paragraph(f"{r['sintomas']}<br/><i>{signos}</i>", body_style),
+                    Paragraph(str(r['derivacion']), body_style)
+                ])
+            t_i = Table(inter_table_data, colWidths=[100, 100, 220, 120])
+            t_i.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 8.5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('PADDING', (0,0), (-1,-1), 4)
+            ]))
+            elements.append(t_i)
+        else:
+            elements.append(Paragraph("No hay intervenciones para el período seleccionado.", body_style))
+    else:
+        elements.append(Paragraph("Sin registros de guardia.", body_style))
+        
+    elements.append(Spacer(1, 15))
+    
+    sig_data = [[
+        Paragraph("____________________________________________<br/><b>Firma y Sello Médico / Gabinete</b>", body_style),
+        Paragraph("____________________________________________<br/><b>Firma y Sello Dirección de Gabinete</b>", body_style)
+    ]]
+    t_sig = Table(sig_data, colWidths=[270, 270])
+    t_sig.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'BOTTOM')
+    ]))
+    elements.append(KeepTogether(t_sig))
+    
+    doc.build(elements)
+    return pdf_filename
+
+
 def generar_pdf_legajo(cad_info, nota_info):
   pdf_filename = sec.nombre_seguro(
       f"Legajo_Medico_{cad_info['id_legajo']}_{nota_info.get('nro_expediente', '')}.pdf",
@@ -1216,7 +1328,7 @@ elif menu == 'Personal del Gabinete':
       with st.form('form_baja_personal'):
         sel_del = st.selectbox('Seleccione el Profesional', lista_del)
         st.markdown('<br>', unsafe_allow_html=True)
-        if st.form_submit_button('🗑️ Confirmar Baja del Staff') and sec.exigir('gestionar_personal'):
+        if st.form_submit_button('🗑️️ Confirmar Baja del Staff') and sec.exigir('gestionar_personal'):
           id_elim = sel_del.split(' - ')[0]
           conn = sqlite3.connect(DB_NAME)
           cursor = conn.cursor()
@@ -1739,38 +1851,33 @@ elif menu == '4. Exámenes Periódicos y Anuales':
 
 elif menu == '5. Historia Clínica Integral':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">📁 Legajo e Historia Clínica Integral del'
-      ' Cadete</h2>',
+      '<div class="pro-header"><p class="pro-title">📁 Legajo e Historia Clínica Integral</p><p class="pro-subtitle">Informe consolidado por cadete, filtrado por año o histórico, con exportación a PDF oficial.</p></div>',
       unsafe_allow_html=True,
   )
   df_cadetes = obtener_cadetes()
   if not df_cadetes.empty:
-    busq_hc = st.text_input(
-        '🔍 Buscar Cadete por Apellido o Legajo para ver Historia Clínica'
-    )
+    col_hc1, col_hc2 = st.columns([2, 1])
+    with col_hc1:
+      busq_hc = st.text_input('🔍 Buscar Cadete por Apellido o Legajo', placeholder='Escriba para buscar...')
+    with col_hc2:
+      anios_disp = ['Historial Completo', '2026', '2025', '2024']
+      anio_seleccionado = st.selectbox('📅 Filtrar por Período / Año', anios_disp)
+      filtro_anio = None if anio_seleccionado == 'Historial Completo' else anio_seleccionado
+      
     df_hc_view = df_cadetes.copy()
     if busq_hc:
       busq_hc_str = str(busq_hc)
       df_hc_view = df_hc_view[
-          df_hc_view['apellido_nombre'].str.contains(
-              busq_hc_str, case=False, na=False
-          )
-          | df_hc_view['id_legajo']
-          .astype(str)
-          .str.contains(busq_hc_str, case=False, na=False)
+          df_hc_view['apellido_nombre'].str.contains(busq_hc_str, case=False, na=False)
+          | df_hc_view['id_legajo'].astype(str).str.contains(busq_hc_str, case=False, na=False)
       ]
     if not df_hc_view.empty:
-      lista_hc = (
-          df_hc_view['id_legajo'].astype(str)
-          + ' - '
-          + df_hc_view['apellido_nombre']
-      ).tolist()
-      seleccion_hc = st.selectbox('Seleccione el Cadete de la Lista', lista_hc)
+      lista_hc = (df_hc_view['id_legajo'].astype(str) + ' - ' + df_hc_view['apellido_nombre']).tolist()
+      seleccion_hc = st.selectbox('Seleccione el Cadete', lista_hc)
       id_leg_hc = seleccion_hc.split(' - ')[0]
-      sec.auditar_vista('Historia Clínica', 'Consulta de historia clínica', id_leg_hc)
-      cad_hc = df_cadetes[
-          df_cadetes['id_legajo'].astype(str) == id_leg_hc
-      ].iloc[0]
+      sec.auditar_vista('Historia Clínica', f'Consulta historia clínica (Filtro: {anio_seleccionado})', id_leg_hc)
+      cad_hc = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_leg_hc].iloc[0]
+      
       st.markdown(
           '<div class="profile-card"><h2>'
           + _html.escape(str(cad_hc['apellido_nombre']))
@@ -1780,20 +1887,39 @@ elif menu == '5. Historia Clínica Integral':
           + _html.escape(str(cad_hc['curso']))
           + '</b> | DNI: <b>'
           + _html.escape(str(cad_hc['dni']))
-          + '</b></p></div>',
+          + '</b> | Período: <b>' + anio_seleccionado + '</b></p></div>',
           unsafe_allow_html=True,
       )
+      
       conn = sqlite3.connect(DB_NAME)
-      df_nm_hc = pd.read_sql_query(
-          'SELECT * FROM notas_medicas WHERE id_legajo = ?', conn, params=(id_leg_hc,)
-      )
-      df_doc_hc = pd.read_sql_query(
-          'SELECT * FROM legajo_documentos WHERE id_legajo = ?', conn, params=(id_leg_hc,)
-      )
+      df_nm_hc = pd.read_sql_query('SELECT * FROM notas_medicas WHERE id_legajo = ?', conn, params=(id_leg_hc,))
+      df_int_hc = pd.read_sql_query('SELECT * FROM primera_intervencion WHERE id_legajo = ?', conn, params=(id_leg_hc,))
+      df_doc_hc = pd.read_sql_query('SELECT * FROM legajo_documentos WHERE id_legajo = ?', conn, params=(id_leg_hc,))
       conn.close()
+      
+      if st.button('📄 Generar e Imprimir Historia Clínica en PDF Oficial'):
+        pdf_hc_path = generar_pdf_historia_clinica(cad_hc, df_nm_hc, df_int_hc, filtro_anio)
+        sec.registrar_auditoria('Historia Clínica', 'EXPORT', f'Generación de PDF de Historia Clínica ({anio_seleccionado})', id_leg_hc)
+        st.success('¡PDF de Historia Clínica Integral generado correctamente!')
+        if os.path.exists(pdf_hc_path):
+          with open(pdf_hc_path, 'rb') as f_pdf:
+            st.download_button(
+                label='⬇️ Descargar Archivo PDF de Historia Clínica',
+                data=f_pdf.read(),
+                file_name=os.path.basename(pdf_hc_path),
+                mime='application/pdf',
+                key='dl_pdf_hc_final'
+            )
+            
+      st.markdown('<br>', unsafe_allow_html=True)
       st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
-      if not df_nm_hc.empty:
-        for _, r in df_nm_hc.iterrows():
+      
+      df_nm_vis = df_nm_hc.copy()
+      if filtro_anio and not df_nm_vis.empty:
+        df_nm_vis = df_nm_vis[df_nm_vis['fecha_desde'].astype(str).str.contains(str(filtro_anio), na=False)]
+        
+      if not df_nm_vis.empty:
+        for _, r in df_nm_vis.iterrows():
           exp_no = _html.escape(str(r['nro_expediente']))
           diag = _html.escape(str(r['diagnostico']))
           med = _html.escape(str(r['medico']))
@@ -1801,43 +1927,28 @@ elif menu == '5. Historia Clínica Integral':
           f_des = _html.escape(str(r['fecha_desde']))
           f_has = _html.escape(str(r['fecha_hasta']))
           est = _html.escape(str(r['estado_alta']))
-          cert_ind = (
-              str(r['certificados_indicaciones'])
-              if pd.notna(r['certificados_indicaciones'])
-              else 'Sin anexos'
-          )
-          an_est = (
-              str(r['analisis_estudios'])
-              if pd.notna(r['analisis_estudios'])
-              else 'Sin estudios'
-          )
-          cert_ind = _html.escape(cert_ind)
-          an_est = _html.escape(an_est)
+          cert_ind = str(r['certificados_indicaciones']) if pd.notna(r['certificados_indicaciones']) else 'Sin anexos'
+          an_est = str(r['analisis_estudios']) if pd.notna(r['analisis_estudios']) else 'Sin estudios'
           card_html = (
-              '<div class="profile-card" style="border-left: 4px solid #38BDF8;">'
-              '<h4>Expediente: '
-              + exp_no
-              + ' | Diagnóstico: '
-              + diag
-              + '</h4><p><b>Médico:</b> '
-              + med
-              + ' | <b>Reposo:</b> '
-              + rep
-              + ' ('
-              + f_des
-              + ' al '
-              + f_has
-              + ') | <b>Estado:</b> '
-              + est
-              + '</p><p><b>Certificados e Indicaciones:</b><br>'
-              + cert_ind
-              + '</p><p><b>Análisis y Estudios:</b><br>'
-              + an_est
-              + '</p></div>'
+              '<div class="panel" style="border-left: 4px solid #38BDF8;">'
+              '<h4>Expediente: ' + exp_no + ' | Diagnóstico: ' + diag + '</h4>'
+              '<p><b>Médico:</b> ' + med + ' | <b>Reposo:</b> ' + rep + ' (' + f_des + ' al ' + f_has + ') | <b>Estado:</b> ' + est + '</p>'
+              '<p><b>Certificados e Indicaciones:</b><br>' + _html.escape(cert_ind) + '</p>'
+              '<p><b>Análisis y Estudios:</b><br>' + _html.escape(an_est) + '</p></div>'
           )
           st.markdown(card_html, unsafe_allow_html=True)
       else:
-        st.write('Sin notas médicas.')
+        st.info(f'No hay notas médicas registradas para el período ({anio_seleccionado}).')
+        
+      st.markdown('### 🩺 Intervenciones de Guardia Registradas')
+      df_int_vis = df_int_hc.copy()
+      if filtro_anio and not df_int_vis.empty:
+        df_int_vis = df_int_vis[df_int_vis['fecha_hora'].astype(str).str.contains(str(filtro_anio), na=False)]
+      if not df_int_vis.empty:
+        st.dataframe(df_int_vis[['fecha_hora', 'profesional_atiende', 'sintomas', 'presion', 'saturacion', 'temperatura', 'derivacion']], use_container_width=True)
+      else:
+        st.info(f'No hay atenciones de guardia para el período ({anio_seleccionado}).')
+        
       st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
@@ -1849,9 +1960,9 @@ elif menu == '5. Historia Clínica Integral':
           if os.path.exists(f_path):
             with open(f_path, 'rb') as f:
               st.download_button(
-                  label=f'📥 Descargar PDF: {f_path}',
+                  label=f'📥 Descargar PDF: {os.path.basename(f_path)}',
                   data=f.read(),
-                  file_name=f_path,
+                  file_name=os.path.basename(f_path),
                   mime='application/pdf',
                   key=f'dl_{doc_id}',
                   on_click=sec.registrar_auditoria,
