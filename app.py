@@ -69,7 +69,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""<style>
+st.markdown('''<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 :root {
   --bg: #05070D; --surface: #0C1220; --surface-2: #111A2E; --border: #1C2740;
@@ -82,7 +82,7 @@ html, body, [class*="css"], .stApp, button, input, textarea, select {
 .stApp {
   background: radial-gradient(900px 400px at 85% -10%, rgba(59,130,246,0.10), transparent 60%),
               radial-gradient(700px 380px at -5% 0%, rgba(34,211,238,0.06), transparent 60%), var(--bg);
-  color: var(--text);
+  color: var(--text) !important;
 }
 [data-testid="stHeader"] { background: transparent; }
 footer { visibility: hidden; }
@@ -112,7 +112,19 @@ h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
 .pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF; }
 .pro-subtitle { font-size: 1rem; color: #93C5FD; margin-top: 0.4rem; }
 .profile-card { background: linear-gradient(135deg, #0F172A 0%, #111B33 100%); padding: 1.5rem 1.75rem; border-radius: 18px; border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; }
-</style>""", unsafe_allow_html=True)
+
+/* Forzar legibilidad total y colores oscuros en todos los campos de texto e inputs */
+input, textarea, select, div[data-baseweb="select"] span, div[data-baseweb="select"] div, .stSelectbox div[data-baseweb="select"] {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+.stTextInput input, .stTextArea textarea, .stDateInput input {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+</style>''', unsafe_allow_html=True)
 
 DB_NAME = 'gabinete_iesp.db'
 EXCEL_FILE = 'LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx'
@@ -711,35 +723,115 @@ elif menu == '1. Primera Intervención':
         st.rerun()
 
 elif menu == '2. Notas Médicas y Reposos':
-  st.markdown('## 📋 Registro de Notas Médicas')
+  st.markdown('## 📋 Registro de Notas Médicas y Reposos')
   df_cadetes = obtener_cadetes()
   if not df_cadetes.empty:
     lista_c = (df_cadetes['id_legajo'].astype(str) + ' - ' + df_cadetes['apellido_nombre']).tolist()
     sel = st.selectbox('Cadete', lista_c)
     id_leg = sel.split(' - ')[0]
     cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_leg].iloc[0]
-    with st.form('form_nota'):
-      nro_exp = st.text_input('Número de Expediente*')
-      med = st.text_input('Médico Tratante*')
-      diag = st.text_area('Diagnóstico*')
-      tipo_rep = st.selectbox('Tipo Reposo', ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'])
-      f_des = st.date_input('Desde', value=sec.ahora_local().date())
-      f_has = st.date_input('Hasta', value=sec.ahora_local().date())
-      cert = st.text_area('Certificados e Indicaciones')
-      anal = st.text_area('Estudios / Análisis')
-      meds = st.text_input('Medicamentos')
-      if st.form_submit_button('Guardar Nota Médica') and sec.exigir('notas_medicas'):
-        if nro_exp and med and diag:
-          conn = sqlite3.connect(DB_NAME)
-          conn.execute("INSERT INTO notas_medicas (id_legajo, nro_expediente, medico, diagnostico, tipo_reposo, fecha_desde, fecha_hasta, medicamentos, certificados_indicaciones, analisis_estudios, estado_alta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')",
-                       (id_leg, nro_exp, med, diag, tipo_rep, str(f_des), str(f_has), meds, cert, anal))
-          conn.commit()
-          conn.close()
-          sec.registrar_auditoria('Notas Médicas', 'INSERT', f'Expediente {nro_exp} registrado', id_leg)
-          st.success('¡Nota médica guardada con éxito!')
-          st.rerun()
-        else:
-          st.warning('Complete los campos obligatorios.')
+    st.markdown(
+        f'<div class="profile-card"><h3 style="margin: 0; color: #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin: 0.25rem 0 0 0; color: #94A3B8;">Legajo: <b>{cad_sel["id_legajo"]}</b> | Curso: <b>{cad_sel["curso"]}</b></p></div>',
+        unsafe_allow_html=True,
+    )
+    
+    with st.form('form_nota', clear_on_submit=True):
+      col1, col2 = st.columns(2)
+      with col1:
+        nro_exp = st.text_input('Número de Expediente* (Ej: EXP-2026-XX)')
+        med = st.text_input('Médico Tratante / Matrícula*')
+        diag = st.text_area('Diagnóstico Médico*')
+        tipo_rep = st.selectbox('Tipo de Reposo', ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'])
+      with col2:
+        f_des = st.date_input('Reposo Desde', value=sec.ahora_local().date())
+        f_has = st.date_input('Reposo Hasta', value=sec.ahora_local().date())
+        cert = st.text_area('Certificados e Indicaciones Médicas')
+        anal = st.text_area('Análisis y Estudios Complementarios')
+      
+      medicamentos = st.text_input('Medicamentos Recetados')
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      uploaded_file = st.file_uploader(
+          '📎 Adjuntar Archivo PDF Externo (Certificado / Análisis / Estudio escaneado)',
+          type=['pdf'],
+      )
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      submitted_nota = st.form_submit_button('💾 Guardar Nota Médica y Expediente')
+
+    if submitted_nota:
+      uploaded_file_valid = sec.validar_pdf(uploaded_file)
+      if nro_exp and med and diag:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+                INSERT INTO notas_medicas (id_legajo, nro_expediente, medico, diagnostico, tipo_reposo, fecha_desde, fecha_hasta, medicamentos, certificados_indicaciones, analisis_estudios, estado_alta)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+            """,
+            (
+                id_leg,
+                nro_exp,
+                med,
+                diag,
+                tipo_rep,
+                str(f_des),
+                str(f_has),
+                medicamentos,
+                cert,
+                anal,
+            ),
+        )
+        conn.commit()
+        nota_dict = {
+            'nro_expediente': nro_exp,
+            'medico': med,
+            'diagnostico': diag,
+            'tipo_reposo': tipo_rep,
+            'fecha_desde': str(f_des),
+            'fecha_hasta': str(f_has),
+            'medicamentos': medicamentos,
+            'certificados_indicaciones': cert,
+            'analisis_estudios': anal,
+        }
+        pdf_path = generar_pdf_legajo(cad_sel, nota_dict)
+        cursor.execute(
+            'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+            ' VALUES (?, ?, ?, ?, ?, ?)',
+            (
+                id_leg,
+                f'Expediente {nro_exp} - Nota Médica y Certificado',
+                'PDF Oficial',
+                str(sec.ahora_local().date()),
+                pdf_path,
+                'Generado automáticamente',
+            ),
+        )
+        if uploaded_file_valid is not None:
+          ext_path = os.path.join(
+              UPLOAD_DIR,
+              sec.nombre_seguro(f'{id_leg}_{nro_exp}_{uploaded_file_valid.name}'),
+          )
+          with open(ext_path, 'wb') as f_ext:
+            f_ext.write(uploaded_file_valid.getbuffer())
+          cursor.execute(
+              'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+              ' VALUES (?, ?, ?, ?, ?, ?)',
+              (
+                  id_leg,
+                  f'Expediente {nro_exp} - Archivo Externo Adjunto',
+                  'PDF Externo',
+                  str(sec.ahora_local().date()),
+                  ext_path,
+                  'Subido por usuario',
+              ),
+          )
+        conn.commit()
+        conn.close()
+        sec.registrar_auditoria('Notas Médicas', 'INSERT', f'Nota médica / expediente {nro_exp} registrado', id_leg)
+        st.success('✅ ¡Nota médica guardada con éxito, expediente generado y campos limpios!')
+      else:
+        st.warning('Complete los campos obligatorios (*).')
 
 elif menu == '3. Control de Alta':
   st.markdown('## ✅ Control de Alta')
@@ -904,7 +996,7 @@ elif menu == '5. Historia Clínica Integral':
           with col_btn2:
             with st.expander(f"🗑️ Eliminar Nota {r['nro_expediente']} (ID: {nota_id})"):
               with st.form(f"form_del_nota_{nota_id}"):
-                st.warning("⚠️ Acción protegida. Ingrese su contraseña para confirmar la eliminación.")
+                st.warning("⚠️ Esta acción es irreversible. Ingrese su contraseña para confirmar la eliminación.")
                 pw_conf = st.text_input("Contraseña del usuario actual", type="password", key=f"pw_del_{nota_id}")
                 if st.form_submit_button("Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
                   usr_actual = st.session_state.get('auth_user', {})
