@@ -7,7 +7,6 @@ import html as _html
 import reportlab
 import seguridad as sec
 import analitica
-import direccion
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
@@ -21,7 +20,6 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 def _buscar_logo(nombre):
-  """Busca el archivo (sin distinguir mayúsculas) en la raíz o en carpetas comunes."""
   for carpeta in ('.', 'assets', 'imagenes', 'img'):
     if os.path.isdir(carpeta):
       for f in os.listdir(carpeta):
@@ -29,10 +27,32 @@ def _buscar_logo(nombre):
           return os.path.join(carpeta, f)
   return None
 
+@st.cache_data(show_spinner=False)
+def logo_uri(nombre, alto=120):
+  ruta = _buscar_logo(nombre)
+  if not ruta:
+    return ''
+  try:
+    import base64
+    import io
+    from PIL import Image, ImageDraw, ImageFilter
+    im = Image.open(ruta).convert('RGBA')
+    m = im.getchannel('A').point(lambda a: 255 if a < 16 else 0)
+    if m.getpixel((0, 0)) == 255:
+      ImageDraw.floodfill(m, (0, 0), 128)
+      huecos = m.point(lambda v: 255 if v == 255 else 0).filter(ImageFilter.MaxFilter(5))
+      blanco = Image.new('RGBA', im.size, (255, 255, 255, 255))
+      im = Image.composite(Image.alpha_composite(blanco, im), im, huecos)
+    ancho = max(1, round(im.width * alto / im.height))
+    im = im.resize((ancho, alto), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, format='PNG', optimize=True)
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+  except Exception:
+    return ''
 
 try:
   from PIL import Image as _PILImage
-
   _ruta_icono = _buscar_logo('GABINETE.png')
   if _ruta_icono:
     _icono = _PILImage.open(_ruta_icono).convert('RGBA')
@@ -50,332 +70,100 @@ st.set_page_config(
 )
 
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");
 :root {
-  color-scheme: dark;
-  --bg: #060913;
-  --surface: #0D1424;
-  --surface-2: #131D33;
-  --field: #08101F;
-  --border: #25324F;
-  --border-strong: #3A4B75;
-  --text: #EAF0FA;
-  --text-soft: #C5D0E6;
-  --muted: #A8B5CF;
-  --faint: #8FA0BF;
-  --accent: #3B82F6;
-  --accent-2: #22D3EE;
-  --ok: #10B981;
-  --warn: #F59E0B;
-  --crit: #EF4444;
-  --info: #38BDF8;
+  --bg: #05070D; --surface: #0C1220; --surface-2: #111A2E; --border: #1C2740;
+  --text: #FFFFFF; --muted: #E2E8F0; --accent: #3B82F6; --accent-2: #22D3EE;
+  --ok: #10B981; --warn: #F59E0B; --crit: #EF4444; --info: #38BDF8;
 }
-
-html, body, [class*="css"], .stApp, button, input, textarea, select {
+html, body, [class*="css"], .stApp, button, input, textarea, select, label, p, span, div {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif !important;
+  color: #FFFFFF !important;
 }
 .stApp {
-  background:
-    radial-gradient(900px 400px at 85% -10%, rgba(59,130,246,0.12), transparent 60%),
-    radial-gradient(700px 380px at -5% 0%, rgba(34,211,238,0.07), transparent 60%),
-    var(--bg);
-  color: var(--text);
+  background: radial-gradient(900px 400px at 85% -10%, rgba(59,130,246,0.10), transparent 60%),
+              radial-gradient(700px 380px at -5% 0%, rgba(34,211,238,0.06), transparent 60%), var(--bg);
+  color: #FFFFFF !important;
 }
 [data-testid="stHeader"] { background: transparent; }
 footer { visibility: hidden; }
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1400px; }
-
-/* ---------- Tipografía ---------- */
-h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
-  color: #FFFFFF !important; font-weight: 800 !important; letter-spacing: -0.01em;
+h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+  color: #FFFFFF !important; font-weight: 800 !important;
 }
-h3 { font-size: 1.25rem !important; }
-.stMarkdown, .stMarkdown p, .stMarkdown li, div[data-testid="stMarkdownContainer"] { color: var(--text); }
-.stMarkdown strong { color: #FFFFFF; }
-[data-testid="stCaptionContainer"], .stCaption, small { color: var(--muted) !important; font-size: 0.82rem !important; }
-a { color: #7DD3FC; }
-
-/* Etiquetas de campos (arriba de cada input) */
-[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label {
-  color: var(--text-soft) !important; font-size: 0.78rem !important; font-weight: 700 !important;
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
-/* Casillas, radios y toggles: texto normal y legible */
-[data-testid="stCheckbox"] label p, [data-testid="stToggle"] label p,
-[data-testid="stRadio"] [role="radiogroup"] label p {
-  color: var(--text) !important; font-size: 0.93rem !important; font-weight: 500 !important;
-  text-transform: none !important; letter-spacing: 0 !important;
-}
-[data-testid="stCheckbox"] span[role="checkbox"], [data-baseweb="checkbox"] > div:first-child {
-  border-color: var(--border-strong) !important;
-}
-
-/* ---------- Sidebar ---------- */
-[data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #0A1122 0%, #070C18 100%);
-  border-right: 1px solid var(--border);
-}
-[data-testid="stSidebar"] > div:first-child { padding-top: 1.2rem; }
-.brand { display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.2rem 1.1rem 0.2rem;
-  border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }
-.brand-logo { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
-  font-size: 1.5rem; background: linear-gradient(135deg, #2563EB, #22D3EE);
-  box-shadow: 0 8px 24px rgba(37,99,235,0.45); }
-.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF; letter-spacing: 0.01em; line-height: 1.15; }
-.brand-sub { font-size: 0.76rem; color: var(--muted); margin-top: 0.15rem; }
-.brand-logo.has-img { background: none; box-shadow: none; width: 54px; height: 58px; }
-.brand-logo img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
-.nav-label { font-size: 0.7rem; font-weight: 700; color: var(--faint); text-transform: uppercase;
-  letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }
-.side-foot { margin-top: 1.2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px;
-  font-size: 0.78rem; color: var(--text-soft); background: rgba(19,29,51,0.7); line-height: 1.5; }
-.side-foot b { color: #FFFFFF; }
-
-[data-testid="stSidebar"] [role="radiogroup"] { gap: 0.2rem; }
-[data-testid="stSidebar"] label[data-baseweb="radio"] {
-  width: 100%; padding: 0.62rem 0.85rem; border-radius: 11px; border: 1px solid transparent;
-  transition: all 0.15s ease; cursor: pointer; margin: 0;
-}
-[data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child { display: none; }
-[data-testid="stSidebar"] label[data-baseweb="radio"] p,
-[data-testid="stSidebar"] label[data-baseweb="radio"] div[data-testid="stMarkdownContainer"] {
-  color: #C5D0E6 !important; font-weight: 600; font-size: 0.9rem; text-transform: none; letter-spacing: 0;
-}
-[data-testid="stSidebar"] label[data-baseweb="radio"]:hover { background: rgba(59,130,246,0.12); }
-[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) {
-  background: linear-gradient(90deg, rgba(59,130,246,0.26), rgba(59,130,246,0.06));
-  border-color: rgba(59,130,246,0.45); box-shadow: inset 3px 0 0 var(--accent);
-}
-[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) p,
-[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) div[data-testid="stMarkdownContainer"] {
+p, span, label, div[data-testid="stMarkdownContainer"] {
   color: #FFFFFF !important;
 }
-[data-testid="stSidebar"] .stButton > button {
-  background: transparent; border: 1px solid var(--border-strong); box-shadow: none; color: var(--text-soft);
+
+/* Etiquetas de formularios en cian brillante */
+label, .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInput label, .stTextArea label, .stNumberInput label {
+  color: #38BDF8 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
-[data-testid="stSidebar"] .stButton > button:hover { border-color: var(--crit); color: #FFFFFF; background: rgba(239,68,68,0.12); }
-[data-testid="stSidebar"] [data-testid="stExpander"] { background: transparent; }
 
-/* ---------- Hero ---------- */
-.hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center;
-  gap: 1.5rem; flex-wrap: wrap; padding: 2rem 2.2rem; border-radius: 22px; margin-bottom: 1.4rem;
-  border: 1px solid #22305A;
-  background:
-    radial-gradient(600px 220px at 100% 0%, rgba(34,211,238,0.18), transparent 65%),
-    radial-gradient(500px 260px at 0% 100%, rgba(99,102,241,0.25), transparent 65%),
-    linear-gradient(135deg, #0B1330 0%, #121B45 100%);
-  box-shadow: 0 24px 50px -20px rgba(0,0,0,0.7); }
-.hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
-  background-image: linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px);
-  background-size: 34px 34px;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 70%); mask-image: linear-gradient(90deg, transparent, #000 70%); }
-.hero > * { position: relative; z-index: 1; }
-.hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-2); }
-.hero-main > div:last-child { flex: 1 1 320px; min-width: 0; max-width: 640px; }
-.hero-org { font-size: 0.95rem; font-weight: 600; color: #7DD3FC; margin-top: 0.55rem; letter-spacing: 0.01em; }
-.hero-title { font-size: 1.6rem; font-weight: 800; color: #FFFFFF; margin: 0.25rem 0 0.35rem 0; letter-spacing: -0.02em; line-height: 1.15; }
-.hero-sub { font-size: 0.98rem; color: #C3CEE6; margin: 0; max-width: 640px; }
-.hero-right { text-align: right; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-end; }
-.chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; border-radius: 999px;
-  font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(16,185,129,0.45); color: #6EE7B7; background: rgba(16,185,129,0.12); }
-.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(16,185,129,0.2); }
-.hero-date { font-size: 0.92rem; font-weight: 600; color: #DCE4F5; }
-.hero-main { display: flex; align-items: center; gap: 1.7rem; flex-wrap: wrap; }
-.hero-logos { display: flex; align-items: center; gap: 1.1rem; padding-right: 1.7rem; border-right: 1px solid rgba(148,163,184,0.22); }
-.hero-logos img { height: 98px; width: auto; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6)); transition: transform 0.2s ease; }
-.hero-logos img:hover { transform: scale(1.06) translateY(-2px); }
-
-/* ---------- KPI ---------- */
-.kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem;
-  border-radius: 18px; border: 1px solid var(--border);
-  background: linear-gradient(180deg, #111B30 0%, #0C1424 100%);
-  transition: transform 0.18s ease, border-color 0.18s ease; }
-.kpi:hover { transform: translateY(-3px); border-color: var(--c); }
-.kpi::before { content: ''; position: absolute; left: 0; top: 14%; bottom: 14%; width: 3px; border-radius: 0 4px 4px 0; background: var(--c); }
-.kpi-icon { flex: 0 0 auto; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; font-size: 1.45rem;
-  background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
-.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF; line-height: 1; letter-spacing: -0.02em; }
-.kpi-label { font-size: 0.74rem; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.4rem; }
-.kpi-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
-
-/* ---------- Alertas del dashboard ---------- */
-.al { --c: var(--info); display: flex; gap: 1rem; align-items: flex-start; padding: 1rem 1.2rem; margin-bottom: 0.75rem;
-  border-radius: 16px; border: 1px solid var(--border); position: relative; overflow: hidden;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 12%, #0D1424) 0%, #0D1424 60%);
-  transition: transform 0.15s ease, border-color 0.15s ease; }
-.al:hover { transform: translateX(3px); border-color: color-mix(in srgb, var(--c) 55%, transparent); }
-.al::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
-.al-0 { --c: var(--crit); } .al-1 { --c: var(--warn); } .al-2 { --c: var(--info); }
-.al-icon { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 1.2rem;
-  background: color-mix(in srgb, var(--c) 20%, transparent); }
-.al-main { flex: 1 1 auto; min-width: 0; }
-.al-pill { display: inline-block; padding: 0.18rem 0.6rem; border-radius: 999px; font-size: 0.68rem; font-weight: 800;
-  text-transform: uppercase; letter-spacing: 0.07em; color: var(--c);
-  background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); }
-.al-name { font-size: 1.05rem; font-weight: 700; color: #FFFFFF; margin-top: 0.4rem; }
-.al-detail { font-size: 0.9rem; color: var(--text-soft); margin-top: 0.15rem; line-height: 1.45; }
-.al-meta { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-end; }
-.tag { font-size: 0.74rem; font-weight: 600; color: var(--text-soft); padding: 0.2rem 0.6rem; border-radius: 8px;
-  background: rgba(148,163,184,0.12); border: 1px solid rgba(148,163,184,0.25); white-space: nowrap; }
-.alert-ok { display: flex; align-items: center; gap: 1rem; padding: 1.4rem 1.5rem; border-radius: 16px;
-  border: 1px solid rgba(16,185,129,0.4); background: linear-gradient(90deg, rgba(16,185,129,0.16), rgba(16,185,129,0.04));
-  color: #A7F3D0; font-weight: 600; }
-.alert-ok .big { font-size: 1.8rem; }
-
-/* ---------- Paneles ---------- */
-.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem;
-  background: linear-gradient(180deg, #111B30 0%, #0C1424 100%); color: var(--text); }
-.panel h3 { margin-top: 0; }
-.panel-title { font-size: 0.76rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.2rem; }
-.panel-big { font-size: 1.7rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em; }
-.panel-note { font-size: 0.8rem; color: var(--muted); margin-top: 0.35rem; }
-.bar { height: 9px; border-radius: 99px; background: #1B2745; overflow: hidden; margin-top: 0.7rem; }
-.bar > div { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #2563EB, #22D3EE); }
-.section-head { display: flex; justify-content: space-between; align-items: end; margin: 0.3rem 0 0.9rem 0; }
-.section-head .t { font-size: 1.15rem; font-weight: 800; color: #FFFFFF; }
-.section-head .s { font-size: 0.84rem; color: var(--muted); }
-
-/* ---------- Pestañas ---------- */
-.stTabs [data-baseweb="tab-list"] { gap: 0.4rem; border-bottom: 1px solid var(--border); }
-.stTabs [data-baseweb="tab"] { height: 46px; padding: 0 1rem; border-radius: 10px 10px 0 0; background: transparent; }
-.stTabs [data-baseweb="tab"] p { color: var(--muted) !important; font-weight: 600; font-size: 0.92rem; }
-.stTabs [data-baseweb="tab"]:hover p { color: #FFFFFF !important; }
-.stTabs [aria-selected="true"] p { color: #FFFFFF !important; }
-.stTabs [data-baseweb="tab-highlight"] { background: linear-gradient(90deg, #3B82F6, #22D3EE) !important; height: 3px; border-radius: 3px; }
-.stTabs [data-baseweb="tab-border"] { background: transparent !important; }
-
-/* ---------- Campos de formulario (independientes del tema del navegador) ---------- */
-[data-baseweb="input"], [data-baseweb="base-input"], [data-baseweb="textarea"],
-[data-baseweb="select"] > div {
-  background-color: var(--field) !important; border: 1px solid var(--border-strong) !important;
-  border-radius: 12px !important; color: #FFFFFF !important;
+[data-testid="stSidebar"] {
+  background: linear-gradient(180deg, #0A1020 0%, #070B16 100%) !important;
+  border-right: 1px solid var(--border);
 }
-.stTextInput input, .stTextArea textarea, .stDateInput input, .stNumberInput input,
-.stTimeInput input, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
-  background: transparent !important; border: none !important; box-shadow: none !important;
-  color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; caret-color: var(--accent-2);
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+  color: #FFFFFF !important;
+}
+[data-testid="stSidebar"] label[data-baseweb="radio"] p,
+[data-testid="stSidebar"] label[data-baseweb="radio"] div {
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
   font-size: 0.95rem !important;
 }
-input::placeholder, textarea::placeholder { color: #7F8FB0 !important; -webkit-text-fill-color: #7F8FB0 !important; opacity: 1 !important; }
-input:disabled, textarea:disabled {
-  color: #9FB0CF !important; -webkit-text-fill-color: #9FB0CF !important; opacity: 1 !important; cursor: not-allowed;
+
+.brand { display: flex; align-items: center; gap: 0.85rem; padding: 0.4rem 0.2rem 1.1rem 0.2rem; border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }
+.brand-logo { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: linear-gradient(135deg, #2563EB, #22D3EE); box-shadow: 0 8px 24px rgba(37,99,235,0.45); }
+.brand-name { font-weight: 800; font-size: 1.02rem; color: #FFFFFF !important; }
+.brand-sub { font-size: 0.74rem; color: #E2E8F0 !important; margin-top: 0.15rem; }
+.nav-label { font-size: 0.72rem; font-weight: 800; color: #38BDF8 !important; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 0.5rem 0.3rem; }
+.side-foot { margin-top: 2rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 12px; font-size: 0.78rem; color: #FFFFFF !important; background: rgba(17,26,46,0.8); }
+
+.hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; padding: 2rem 2.2rem; border-radius: 22px; margin-bottom: 1.4rem; border: 1px solid #22305A; background: radial-gradient(600px 220px at 100% 0%, rgba(34,211,238,0.18), transparent 65%), radial-gradient(500px 260px at 0% 100%, rgba(99,102,241,0.25), transparent 65%), linear-gradient(135deg, #0B1330 0%, #121B45 100%); }
+.kpi { position: relative; overflow: hidden; display: flex; align-items: center; gap: 1rem; padding: 1.15rem 1.3rem; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); }
+.kpi-value { font-size: 2rem; font-weight: 800; color: #FFFFFF !important; }
+.kpi-label { font-size: 0.72rem; font-weight: 700; color: #E2E8F0 !important; text-transform: uppercase; }
+.panel { border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem 1.3rem; margin-bottom: 1rem; background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%); color: #FFFFFF !important; }
+.pro-header { background: linear-gradient(135deg, #0B1330 0%, #121B45 100%); padding: 2rem; border-radius: 20px; border: 1px solid #22305A; color: white; margin-bottom: 1.5rem; }
+.pro-title { font-size: 2rem; font-weight: 800; margin: 0; color: #FFFFFF !important; }
+.pro-subtitle { font-size: 1rem; color: #93C5FD !important; margin-top: 0.4rem; }
+.profile-card { background: linear-gradient(135deg, #0F172A 0%, #111B33 100%); padding: 1.5rem 1.75rem; border-radius: 18px; border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; color: #FFFFFF !important; }
+
+input, textarea, select, div[data-baseweb="select"] span, div[data-baseweb="select"] div {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
 }
-[data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {
-  border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.28) !important;
+.stTextInput input, .stTextArea textarea, .stDateInput input {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
 }
-[data-baseweb="select"] * { color: #FFFFFF !important; }
-[data-baseweb="select"] svg { fill: #9FB0CF !important; }
-.stNumberInput button { background: var(--surface-2) !important; color: #FFFFFF !important; border: none !important; }
-.stNumberInput button svg { fill: #FFFFFF !important; }
-[data-baseweb="tag"] { background: rgba(59,130,246,0.25) !important; border-radius: 8px !important; }
-[data-baseweb="tag"] span { color: #DBEAFE !important; text-transform: none; letter-spacing: 0; font-weight: 600; }
-[data-baseweb="tag"] svg { fill: #DBEAFE !important; }
 
-/* Listas desplegables y calendario */
-[data-baseweb="popover"] > div, [data-baseweb="popover"] [data-baseweb="menu"], [data-baseweb="popover"] ul {
-  background: var(--surface-2) !important; border: 1px solid var(--border-strong); border-radius: 12px;
+div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"], li[role="option"] {
+  background-color: #0C1220 !important;
+  color: #FFFFFF !important;
 }
-[data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"] { background: transparent !important; }
-[data-baseweb="popover"] li *, [data-baseweb="popover"] [role="option"] * { color: var(--text) !important; }
-[data-baseweb="popover"] li:hover, [data-baseweb="popover"] [role="option"]:hover,
-[data-baseweb="popover"] [aria-selected="true"] { background: rgba(59,130,246,0.25) !important; }
-[data-baseweb="calendar"] { background: var(--surface-2) !important; color: var(--text) !important; }
-[data-baseweb="calendar"] * { color: var(--text) !important; }
-[data-baseweb="calendar"] [aria-selected="true"], [data-baseweb="calendar"] [aria-selected="true"] * {
-  background: var(--accent) !important; color: #FFFFFF !important; border-radius: 8px;
+div[data-baseweb="popover"] *, div[data-baseweb="menu"] *, ul[role="listbox"] * {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
 }
-[data-baseweb="calendar"] [aria-disabled="true"], [data-baseweb="calendar"] [aria-disabled="true"] * { color: #55627F !important; }
-[data-baseweb="calendar"] svg { fill: #FFFFFF !important; }
-
-/* Carga de archivos */
-[data-testid="stFileUploaderDropzone"] {
-  background: var(--field) !important; border: 1.5px dashed var(--border-strong) !important; border-radius: 14px !important;
+ul[role="listbox"] li:hover, ul[role="listbox"] li[aria-selected="true"] {
+  background-color: #1E3A8A !important;
+  color: #FFFFFF !important;
 }
-[data-testid="stFileUploaderDropzone"]:hover { border-color: var(--accent) !important; }
-[data-testid="stFileUploaderDropzone"] *, [data-testid="stFileUploaderFile"] * { color: var(--text-soft) !important; }
-[data-testid="stFileUploaderDropzone"] button { background: var(--surface-2) !important; color: #FFFFFF !important;
-  border: 1px solid var(--border-strong) !important; box-shadow: none !important; }
-[data-testid="stFileUploaderDropzone"] svg { fill: var(--muted) !important; }
-
-/* Slider */
-[data-testid="stSliderThumbValue"], [data-testid="stSlider"] [data-testid="stThumbValue"] { color: #FFFFFF !important; }
-[data-testid="stTickBarMin"], [data-testid="stTickBarMax"] { color: var(--muted) !important; }
-
-/* ---------- Botones ---------- */
-.stButton > button, .stFormSubmitButton > button {
-  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: #FFFFFF; font-weight: 700; border: none;
-  border-radius: 12px; padding: 0.6rem 1.4rem; box-shadow: 0 6px 18px rgba(37,99,235,0.35); transition: all 0.15s ease; }
-.stButton > button p, .stFormSubmitButton > button p { color: #FFFFFF !important; }
-.stButton > button:hover, .stFormSubmitButton > button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(37,99,235,0.5); color: #FFFFFF; }
-.stButton > button:disabled, .stFormSubmitButton > button:disabled {
-  background: #1B2745; color: #7F8FB0; box-shadow: none; cursor: not-allowed; transform: none; }
-.stButton > button:disabled p { color: #7F8FB0 !important; }
-.stDownloadButton > button { background: var(--surface-2); color: #E3EAF8; font-weight: 600; border: 1px solid var(--border-strong);
-  border-radius: 12px; box-shadow: none; }
-.stDownloadButton > button p { color: #E3EAF8 !important; }
-.stDownloadButton > button:hover { border-color: var(--accent); color: #FFFFFF; background: #182544; }
-button:focus-visible, input:focus-visible, [role="tab"]:focus-visible { outline: 2px solid var(--accent-2) !important; outline-offset: 2px; }
-
-/* ---------- Contenedores ---------- */
-[data-testid="stExpander"] { border: 1px solid var(--border) !important; border-radius: 14px !important; background: var(--surface); }
-[data-testid="stExpander"] summary p { color: #E3EAF8 !important; font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 0.92rem; }
-[data-testid="stExpander"] summary svg { fill: var(--muted) !important; }
-[data-testid="stDataFrame"] { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-[data-testid="stForm"] { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); padding: 1.3rem; }
-hr { border-color: var(--border) !important; }
-
-/* Métricas nativas */
-[data-testid="stMetric"] { background: linear-gradient(180deg, #111B30 0%, #0C1424 100%); border: 1px solid var(--border);
-  border-radius: 16px; padding: 0.9rem 1.1rem; }
-[data-testid="stMetricLabel"] p, [data-testid="stMetricLabel"] { color: var(--text-soft) !important; font-weight: 600; font-size: 0.8rem !important; }
-[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 800; }
-
-/* Mensajes (info / éxito / aviso / error): tarjeta oscura con texto claro */
-[data-testid="stAlert"] { border-radius: 14px; background: #121C33 !important; border: 1px solid var(--border-strong); }
-[data-testid="stAlert"] *, [data-testid="stAlertContainer"] * { color: #F1F5FB !important; }
-[data-testid="stAlert"] svg { fill: currentColor; }
-[data-testid="stTooltipContent"], [data-baseweb="tooltip"] > div { background: #1B2745 !important; color: #FFFFFF !important; }
-[data-testid="stSpinner"] * { color: var(--text-soft) !important; }
-code { color: #A5F3FC !important; background: #0A1424 !important; }
-[data-testid="stCode"] pre, .stCodeBlock pre { background: #08101F !important; border: 1px solid var(--border); border-radius: 12px; }
-
-/* Barras de desplazamiento */
-* { scrollbar-width: thin; scrollbar-color: #2A3A63 transparent; }
-*::-webkit-scrollbar { width: 9px; height: 9px; }
-*::-webkit-scrollbar-thumb { background: #2A3A63; border-radius: 99px; }
-*::-webkit-scrollbar-track { background: transparent; }
-
-/* ---------- Componentes propios de las pantallas ---------- */
-.pro-header { position: relative; overflow: hidden; background:
-    radial-gradient(500px 200px at 100% 0%, rgba(34,211,238,0.14), transparent 65%),
-    linear-gradient(135deg, #0B1330 0%, #121B45 100%);
-  padding: 1.7rem 2rem; border-radius: 20px; border: 1px solid #22305A; color: white; margin-bottom: 1.5rem; }
-.pro-title { font-size: 1.8rem; font-weight: 800; margin: 0; color: #FFFFFF; letter-spacing: -0.02em; }
-.pro-subtitle { font-size: 1rem; color: #B6D3FF; margin-top: 0.4rem; margin-bottom: 0; }
-.metric-card { background: linear-gradient(180deg, #111B30 0%, #0C1424 100%); padding: 1.3rem; border-radius: 16px;
-  border: 1px solid var(--border); text-align: center; }
-.metric-value { font-size: 2.1rem; font-weight: 800; color: #38BDF8; }
-.metric-label { font-size: 0.76rem; color: var(--text-soft); text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em; margin-top: 0.35rem; }
-.profile-card { background: linear-gradient(135deg, #111B30 0%, #14203A 100%); padding: 1.5rem 1.75rem; border-radius: 18px;
-  border: 1px solid var(--border); border-left: 4px solid var(--accent); margin-bottom: 1.5rem; color: var(--text); }
-.profile-card h1, .profile-card h2, .profile-card h3, .profile-card h4 { color: #FFFFFF !important; }
-.profile-card p, .profile-card div, .profile-card span, .profile-card li { color: var(--text-soft); }
-.profile-card b, .profile-card strong { color: #FFFFFF; }
-.alert-card { background: rgba(120,53,15,0.4); border: 1px solid #B45309; padding: 1.1rem; border-radius: 14px; margin-bottom: 1rem; color: #FEF3C7; }
-.alert-card * { color: #FEF3C7; }
-
-@media (max-width: 768px) {
-  .hero-logos { border-right: none; padding-right: 0; } .hero-logos img { height: 64px; }
-  .hero { padding: 1.4rem; } .hero-title { font-size: 1.25rem; } .hero-right { align-items: flex-start; text-align: left; }
-  .al { flex-wrap: wrap; } .al-meta { flex-direction: row; align-items: flex-start; }
-  .block-container { padding-left: 1rem; padding-right: 1rem; }
-}
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-
-</style>
-""", unsafe_allow_html=True)
+</style>""", unsafe_allow_html=True)
 
 DB_NAME = 'gabinete_iesp.db'
 EXCEL_FILE = 'LISTADO DE COMPAÑIA DE CADETES AÑO 2026 PARA D1.xlsx'
@@ -383,183 +171,146 @@ UPLOAD_DIR = 'documentos_legajos'
 if not os.path.exists(UPLOAD_DIR):
   os.makedirs(UPLOAD_DIR)
 
-
-def importar_excel_directo():
-  if not os.path.exists(EXCEL_FILE):
-    return False, f'No se encontro el archivo Excel: {EXCEL_FILE}'
-  try:
-    df_excel = pd.read_excel(EXCEL_FILE, sheet_name=0)
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cargados = 0
-    for _, row in df_excel.iterrows():
-      if pd.isna(row.get('APELLIDO')) or pd.isna(row.get('NOMBRES')):
-        continue
-      id_leg = str(row.get('CARGO', row.get('N°', 'S/N'))).strip()
-      ap_nom = (
-          f"{str(row.get('APELLIDO', '')).strip()},"
-          f" {str(row.get('NOMBRES', '')).strip()}"
-      )
-      curso = str(row.get('CURSO', '1 AÑO')).strip()
-      dni = str(row.get('DNI', '')).strip()
-      genero = 'Masculino'
-      f_nac = (
-          str(row.get('FECHA DE NACIMIENTO', '')).split(' ')[0]
-          if pd.notna(row.get('FECHA DE NACIMIENTO'))
-          else ''
-      )
-      obs = (
-          f"Email: {row.get('EMAIL', '')} | Celular: {row.get('CELULAR', '')}"
-          f" | CUIL: {row.get('CUIL', '')}"
-      )
-      cursor.execute(
-          'INSERT OR IGNORE INTO cadetes VALUES (?, ?, ?, ?, ?, ?, ?)',
-          (id_leg, ap_nom, curso, dni, genero, f_nac, obs),
-      )
-      cargados += 1
-    conn.commit()
-    conn.close()
-    return True, f'Sincronizados {cargados} cadetes.'
-  except Exception as e:
-    return False, str(e)
-
-
 def init_db():
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS cadetes (id_legajo TEXT PRIMARY KEY,'
-      ' apellido_nombre TEXT NOT NULL, curso TEXT NOT NULL, dni TEXT, genero'
-      ' TEXT, fecha_nacimiento TEXT, observaciones TEXT)'
-  )
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS personal_gabinete (id_legajo_personal TEXT'
-      ' PRIMARY KEY, apellido_nombre TEXT NOT NULL, dni TEXT, matricula TEXT,'
-      ' especialidad TEXT, telefono TEXT)'
-  )
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS primera_intervencion (id INTEGER PRIMARY KEY'
-      ' AUTOINCREMENT, id_legajo TEXT, fecha_hora TEXT, profesional_atiende'
-      ' TEXT, sintomas TEXT, presion TEXT, saturacion TEXT, derivacion TEXT)'
-  )
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS notas_medicas (id INTEGER PRIMARY KEY'
-      ' AUTOINCREMENT, id_legajo TEXT, nro_expediente TEXT, medico TEXT,'
-      ' diagnostico TEXT, tipo_reposo TEXT, fecha_desde TEXT, fecha_hasta TEXT,'
-      ' medicamentos TEXT, certificados_indicaciones TEXT, analisis_estudios'
-      ' TEXT, estado_alta TEXT DEFAULT "Pendiente")'
-  )
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS legajo_documentos (id INTEGER PRIMARY KEY'
-      ' AUTOINCREMENT, id_legajo TEXT, titulo_documento TEXT, tipo_documento'
-      ' TEXT, fecha_subida TEXT, archivo_nombre TEXT, observaciones TEXT)'
-  )
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS examenes_periodicos (id INTEGER PRIMARY KEY'
-      ' AUTOINCREMENT, id_legajo TEXT, anio TEXT, ddjj_enfermedades TEXT, visus'
-      ' TEXT, hemograma TEXT, orina TEXT, electrocardiograma TEXT,'
-      ' aptitud_fisica TEXT, toxicologico TEXT, beta_hcg TEXT, fecha_registro'
-      ' TEXT)'
-  )
-  cursor.execute(
-      'CREATE TABLE IF NOT EXISTS examen_baja (id INTEGER PRIMARY KEY'
-      ' AUTOINCREMENT, id_legajo TEXT, fecha_baja TEXT, motivo TEXT,'
-      ' estado_salud_egreso TEXT, observaciones_medicas TEXT)'
-  )
-
-  for col, col_type in [
-      ('certificados_indicaciones', 'TEXT'),
-      ('analisis_estudios', 'TEXT'),
-      ('medicamentos', 'TEXT'),
-      ('estado_alta', 'TEXT DEFAULT "Pendiente"'),
-      ('fecha_alta_efectiva', 'TEXT'),
-      ('medico_alta', 'TEXT'),
-      ('observaciones_alta', 'TEXT'),
-  ]:
-    try:
-      cursor.execute(f'ALTER TABLE notas_medicas ADD COLUMN {col} {col_type};')
-    except sqlite3.OperationalError:
-      pass
-
-  # Migración: asegurar columnas en primera_intervencion (DB con esquema viejo)
-  for col, col_type in [
-      ('id_legajo', 'TEXT'),
-      ('fecha_hora', 'TEXT'),
-      ('profesional_atiende', 'TEXT'),
-      ('sintomas', 'TEXT'),
-      ('presion', 'TEXT'),
-      ('saturacion', 'TEXT'),
-      ('derivacion', 'TEXT'),
-      ('temperatura', 'TEXT'),
-  ]:
-    try:
-      cursor.execute(
-          f'ALTER TABLE primera_intervencion ADD COLUMN {col} {col_type};'
-      )
-    except sqlite3.OperationalError:
-      pass  # la columna ya existe
-
+  cursor.execute('CREATE TABLE IF NOT EXISTS cadetes (id_legajo TEXT PRIMARY KEY, apellido_nombre TEXT NOT NULL, curso TEXT NOT NULL, dni TEXT, genero TEXT, fecha_nacimiento TEXT, observaciones TEXT)')
+  cursor.execute('CREATE TABLE IF NOT EXISTS personal_gabinete (id_legajo_personal TEXT PRIMARY KEY, apellido_nombre TEXT NOT NULL, dni TEXT, matricula TEXT, especialidad TEXT, telefono TEXT)')
+  cursor.execute('CREATE TABLE IF NOT EXISTS primera_intervencion (id INTEGER PRIMARY KEY AUTOINCREMENT, id_legajo TEXT, fecha_hora TEXT, profesional_atiende TEXT, sintomas TEXT, presion TEXT, saturacion TEXT, temperatura TEXT, derivacion TEXT)')
+  cursor.execute('CREATE TABLE IF NOT EXISTS notas_medicas (id INTEGER PRIMARY KEY AUTOINCREMENT, id_legajo TEXT, nro_expediente TEXT, medico TEXT, diagnostico TEXT, tipo_reposo TEXT, fecha_desde TEXT, fecha_hasta TEXT, medicamentos TEXT, certificados_indicaciones TEXT, analisis_estudios TEXT, estado_alta TEXT DEFAULT "Pendiente", fecha_alta_efectiva TEXT, medico_alta TEXT, observaciones_alta TEXT)')
+  cursor.execute('CREATE TABLE IF NOT EXISTS legajo_documentos (id INTEGER PRIMARY KEY AUTOINCREMENT, id_legajo TEXT, titulo_documento TEXT, tipo_documento TEXT, fecha_subida TEXT, archivo_nombre TEXT, observaciones TEXT)')
+  cursor.execute('CREATE TABLE IF NOT EXISTS examenes_periodicos (id INTEGER PRIMARY KEY AUTOINCREMENT, id_legajo TEXT, anio TEXT, ddjj_enfermedades TEXT, visus TEXT, hemograma TEXT, orina TEXT, electrocardiograma TEXT, aptitud_fisica TEXT, toxicologico TEXT, beta_hcg TEXT, fecha_registro TEXT)')
+  cursor.execute('CREATE TABLE IF NOT EXISTS examen_baja (id INTEGER PRIMARY KEY AUTOINCREMENT, id_legajo TEXT, fecha_baja TEXT, motivo TEXT, estado_salud_egreso TEXT, observaciones_medicas TEXT)')
   conn.commit()
   conn.close()
 
-  conn = sqlite3.connect(DB_NAME)
-  cursor = conn.cursor()
-  cursor.execute('SELECT COUNT(*) FROM cadetes')
-  count = cursor.fetchone()[0]
-  conn.close()
-  if count == 0:
-    importar_excel_directo()
-
-
 init_db()
 
-
-@st.cache_data(show_spinner=False)
-def logo_uri(nombre, alto=120):
-  """Devuelve el logo como data URI (PNG redimensionado) o '' si no existe."""
-  ruta = _buscar_logo(nombre)
-  if not ruta:
-    return ''
-  try:
-    import base64
-    import io
-    from PIL import Image
-
-    from PIL import ImageDraw, ImageFilter
-
-    im = Image.open(ruta).convert('RGBA')
-    # Los logos tienen zonas internas transparentes (ej. el círculo blanco).
-    # Se rellenan de blanco para que se vean bien sobre el fondo oscuro.
-    m = im.getchannel('A').point(lambda a: 255 if a < 16 else 0)
-    if m.getpixel((0, 0)) == 255:
-      ImageDraw.floodfill(m, (0, 0), 128)  # marca el exterior
-      huecos = m.point(lambda v: 255 if v == 255 else 0).filter(
-          ImageFilter.MaxFilter(5)
-      )
-      blanco = Image.new('RGBA', im.size, (255, 255, 255, 255))
-      im = Image.composite(Image.alpha_composite(blanco, im), im, huecos)
-    ancho = max(1, round(im.width * alto / im.height))
-    im = im.resize((ancho, alto), Image.LANCZOS)
-    buf = io.BytesIO()
-    im.save(buf, format='PNG', optimize=True)
-    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
-  except Exception:
-    return ''
-
-
 def obtener_cadetes():
-  conn = sqlite3.connect(DB_NAME)
-  df = pd.read_sql_query('SELECT * FROM cadetes', conn)
-  conn.close()
-  return df
-
+    conn = sqlite3.connect(DB_NAME)
+    df = pd.read_sql_query('SELECT * FROM cadetes', conn)
+    conn.close()
+    return df
 
 def obtener_personal():
-  conn = sqlite3.connect(DB_NAME)
-  df = pd.read_sql_query('SELECT * FROM personal_gabinete', conn)
-  conn.close()
-  return df
+    conn = sqlite3.connect(DB_NAME)
+    df = pd.read_sql_query('SELECT * FROM personal_gabinete', conn)
+    conn.close()
+    return df
 
+def generar_pdf_historia_clinica(cad_info, df_notas, df_intervenciones, anio_filtro=None):
+    pdf_filename = sec.nombre_seguro(f"Historia_Clinica_Completa_{cad_info['id_legajo']}_{anio_filtro if anio_filtro else 'Historica'}.pdf", unico=False)
+    doc = SimpleDocTemplate(pdf_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    normal_style = styles['Normal']
+    
+    title_style = ParagraphStyle('DocTitle', parent=normal_style, fontName='Helvetica-Bold', fontSize=14, leading=16, textColor=colors.HexColor('#1E3A8A'), alignment=1)
+    subtitle_style = ParagraphStyle('DocSubtitle', parent=normal_style, fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#64748B'), alignment=1)
+    section_heading = ParagraphStyle('SectionHeading', parent=normal_style, fontName='Helvetica-Bold', fontSize=10, leading=13, textColor=colors.HexColor('#1E3A8A'), spaceBefore=10, spaceAfter=4)
+    body_style = ParagraphStyle('BodyPro', parent=normal_style, fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#1F2937'))
+    
+    elements = []
+    elements.append(Paragraph("INSTITUTO DE ENSEÑANZA SUPERIOR DE POLICÍA", title_style))
+    elements.append(Paragraph("«Gral. José Francisco de San Martín»<br/>Dirección de Gabinete Interdisciplinario - Historia Clínica Sanitaria Integral", subtitle_style))
+    elements.append(Spacer(1, 10))
+    
+    cadet_info_data = [
+        [Paragraph(f"<b>Cadete:</b> {cad_info['apellido_nombre']}", body_style), Paragraph(f"<b>Legajo:</b> {cad_info['id_legajo']}", body_style)],
+        [Paragraph(f"<b>Curso:</b> {cad_info['curso']}", body_style), Paragraph(f"<b>DNI:</b> {cad_info['dni']}", body_style)],
+        [Paragraph(f"<b>Género:</b> {cad_info['genero']}", body_style), Paragraph(f"<b>Período del Reporte:</b> {'Año ' + str(anio_filtro) if anio_filtro else 'Historial Clínico Completo'}", body_style)]
+    ]
+    t_cadet = Table(cadet_info_data, colWidths=[270, 270])
+    t_cadet.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E1')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING', (0,0), (-1,-1), 5)
+    ]))
+    elements.append(t_cadet)
+    elements.append(Spacer(1, 10))
+    
+    elements.append(Paragraph("1. REGISTRO COMPLETO DE NOTAS MÉDICAS Y REPOSOS", section_heading))
+    if not df_notas.empty:
+        if anio_filtro:
+            df_notas_pdf = df_notas[df_notas['fecha_desde'].astype(str).str.contains(str(anio_filtro), na=False)]
+        else:
+            df_notas_pdf = df_notas.copy()
+            
+        if not df_notas_pdf.empty:
+            for _, r in df_notas_pdf.iterrows():
+                exp_txt = f"<b>Expediente:</b> {r['nro_expediente']} | <b>Estado:</b> {r['estado_alta']}"
+                med_txt = f"<b>Médico:</b> {r['medico']} | <b>Tipo:</b> {r['tipo_reposo']} ({r['fecha_desde']} al {r['fecha_hasta']})"
+                diag_txt = f"<b>Diagnóstico:</b> {r['diagnostico']}"
+                cert_txt = f"<b>Certificado/Indicaciones:</b> {r.get('certificados_indicaciones', 'Sin anexos')}"
+                est_txt = f"<b>Estudios:</b> {r.get('analisis_estudios', 'Sin estudios')}"
+                
+                detalles_nota = [
+                    [Paragraph(exp_txt, body_style)],
+                    [Paragraph(med_txt, body_style)],
+                    [Paragraph(diag_txt, body_style)],
+                    [Paragraph(cert_txt, body_style)],
+                    [Paragraph(est_txt, body_style)]
+                ]
+                t_single_nota = Table(detalles_nota, colWidths=[540])
+                t_single_nota.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#FFFFFF')),
+                    ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#94A3B8')),
+                    ('PADDING', (0,0), (-1,-1), 5),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 4)
+                ]))
+                elements.append(t_single_nota)
+                elements.append(Spacer(1, 6))
+        else:
+            elements.append(Paragraph("No hay notas médicas para el período seleccionado.", body_style))
+    else:
+        elements.append(Paragraph("Sin registros de notas médicas.", body_style))
+        
+    elements.append(Spacer(1, 10))
+    
+    elements.append(Paragraph("2. INTERVENCIONES Y ATENCIONES DE GUARDIA", section_heading))
+    if not df_intervenciones.empty:
+        if anio_filtro:
+            df_int_pdf = df_intervenciones[df_intervenciones['fecha_hora'].astype(str).str.contains(str(anio_filtro), na=False)]
+        else:
+            df_int_pdf = df_intervenciones.copy()
+            
+        if not df_int_pdf.empty:
+            inter_table_data = [["Fecha / Hora", "Profesional", "Síntomas / Signos", "Derivación"]]
+            for _, r in df_int_pdf.iterrows():
+                signos = f"PA: {r.get('presion','-')} | SpO2: {r.get('saturacion','-')} | T: {r.get('temperatura','-')}°C"
+                inter_table_data.append([
+                    Paragraph(str(r['fecha_hora']), body_style),
+                    Paragraph(str(r['profesional_atiende']), body_style),
+                    Paragraph(f"{r['sintomas']}<br/><i>{signos}</i>", body_style),
+                    Paragraph(str(r['derivacion']), body_style)
+                ])
+            t_i = Table(inter_table_data, colWidths=[100, 100, 220, 120])
+            t_i.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 8.5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('PADDING', (0,0), (-1,-1), 4)
+            ]))
+            elements.append(t_i)
+        else:
+            elements.append(Paragraph("No hay intervenciones para el período seleccionado.", body_style))
+    else:
+        elements.append(Paragraph("Sin registros de guardia.", body_style))
+        
+    elements.append(Spacer(1, 15))
+    sig_data = [[
+        Paragraph("____________________________________________<br/><b>Firma y Sello Médico / Gabinete</b>", body_style),
+        Paragraph("____________________________________________<br/><b>Firma y Sello Dirección de Gabinete</b>", body_style)
+    ]]
+    t_sig = Table(sig_data, colWidths=[270, 270])
+    t_sig.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'BOTTOM')]))
+    elements.append(KeepTogether(t_sig))
+    
+    doc.build(elements)
+    return pdf_filename
 
 def generar_pdf_legajo(cad_info, nota_info):
   pdf_filename = sec.nombre_seguro(
@@ -727,23 +478,12 @@ def generar_pdf_legajo(cad_info, nota_info):
   doc.build(elements)
   return pdf_filename
 
-
 _logo_gab = logo_uri('GABINETE.png', 116)
 _brand_logo = (
     f'<div class="brand-logo has-img"><img src="{_logo_gab}" alt="Gabinete"></div>'
     if _logo_gab
     else '<div class="brand-logo">🛡️</div>'
 )
-_matriz = getattr(sec, '_PERMISOS_MATRIZ', None)
-if _matriz is None:
-  _matriz = sec.PERMISOS
-_matriz.setdefault('panel_direccion', {sec.ROL_ADMIN, sec.ROL_DIRECTIVO})
-_matriz.setdefault('respaldo', {sec.ROL_ADMIN})
-if 'Panel de Dirección' not in sec.MENU_PERMISOS:
-  sec.MENU_PERMISOS = {
-      'Panel de Dirección': 'panel_direccion', **sec.MENU_PERMISOS,
-      '10. Respaldo del Sistema': 'respaldo'}
-
 sec.init_seguridad(DB_NAME)
 sec.exigir_login(_brand_logo)
 
@@ -768,8 +508,6 @@ ICONOS_MENU = {
     '7. Informes y Análisis de Datos (Spark)': '📈',
     '8. Gestión de Usuarios': '👤',
     '9. Auditoría del Sistema': '🛡️',
-    'Panel de Dirección': '🏛️',
-    '10. Respaldo del Sistema': '💾',
 }
 
 menu = st.sidebar.radio(
@@ -791,10 +529,8 @@ DIAS_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Dom
 MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
             'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-
 def fecha_larga_es(d):
   return f'{DIAS_ES[d.weekday()]} {d.day} de {MESES_ES[d.month - 1]} de {d.year}'
-
 
 def kpi_card(icono, valor, rotulo, color='#38BDF8', sub=''):
   sub_html = f'<div class="kpi-sub">{sub}</div>' if sub else ''
@@ -804,16 +540,11 @@ def kpi_card(icono, valor, rotulo, color='#38BDF8', sub=''):
       f'{sub_html}</div></div>'
   )
 
-
 def construir_alertas(df_n, df_e, df_i, hoy):
-  """Devuelve una lista de alertas ordenadas por gravedad."""
-
   def _txt(valor, defecto='-'):
     return defecto if pd.isna(valor) or str(valor).strip() == '' else str(valor)
 
   alertas = []
-
-  # --- Reposos con alta pendiente (vencidos / por vencer / vigentes)
   if not df_n.empty:
     pend = df_n[df_n['estado_alta'] == 'Pendiente']
     for _, r in pend.iterrows():
@@ -845,7 +576,6 @@ def construir_alertas(df_n, df_e, df_i, hoy):
                         'detalle': f'Reposo ({tipo_rep}) hasta el {f_h:%d/%m/%Y} (faltan {-dias} días).',
                         'orden': -dias})
 
-  # --- Beta HCG: último control por cadete (mujeres) con más de 90 días
   if not df_e.empty:
     fem = df_e[df_e['genero'] == 'Femenino'].copy()
     if not fem.empty:
@@ -864,7 +594,6 @@ def construir_alertas(df_n, df_e, df_i, hoy):
               'detalle': f'Último control el {r["_f"]:%d/%m/%Y} (hace {dias} días). Supera el control trimestral.',
               'orden': dias})
 
-  # --- Reincidencia: 3 o más intervenciones en 30 días
   if not df_i.empty:
     di = df_i.copy()
     di['_f'] = pd.to_datetime(di['fecha_hora'], errors='coerce')
@@ -883,7 +612,6 @@ def construir_alertas(df_n, df_e, df_i, hoy):
   alertas.sort(key=lambda a: (a['nivel'], -a['orden']))
   return alertas
 
-
 if menu == 'Dashboard General':
   _l_dir = logo_uri('DIRECCION.png', 200)
   _l_gab = logo_uri('GABINETE.png', 200)
@@ -897,12 +625,9 @@ if menu == 'Dashboard General':
   st.markdown(
       f'<div class="hero"><div class="hero-main">{_logos_html}<div>'
       '<div class="hero-eyebrow">Panel de control</div>'
-      '<div class="hero-title">Dirección de Gabinete Interdisciplinario de'
-      ' Asesoramiento Psicopedagógico y Psicológico</div>'
-      '<div class="hero-org">Dirección General de Institutos e Instrucción ·'
-      ' Policía de Tucumán</div></div></div><div'
-      ' class="hero-right"><div class="chip"><span class="dot"></span>Sistema'
-      ' operativo</div>'
+      '<div class="hero-title">Dirección de Gabinete Interdisciplinario de Asesoramiento Psicopedagógico y Psicológico</div>'
+      '<div class="hero-org">Dirección General de Institutos e Instrucción · Policía de Tucumán</div></div></div><div'
+      ' class="hero-right"><div class="chip"><span class="dot"></span>Sistema operativo</div>'
       f'<div class="hero-date">{fecha_larga_es(sec.ahora_local().date())}</div>'
       '</div></div>',
       unsafe_allow_html=True,
@@ -910,35 +635,17 @@ if menu == 'Dashboard General':
   df_c = obtener_cadetes()
   df_p = obtener_personal()
   conn = sqlite3.connect(DB_NAME)
-  df_n = pd.read_sql_query(
-      'SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN'
-      ' cadetes c ON n.id_legajo = c.id_legajo',
-      conn,
-  )
-  df_e = pd.read_sql_query(
-      'SELECT e.*, c.apellido_nombre, c.curso, c.genero FROM examenes_periodicos'
-      ' e LEFT JOIN cadetes c ON e.id_legajo = c.id_legajo',
-      conn,
-  )
-  df_i = pd.read_sql_query(
-      'SELECT i.*, c.apellido_nombre, c.curso FROM primera_intervencion i LEFT'
-      ' JOIN cadetes c ON i.id_legajo = c.id_legajo',
-      conn,
-  )
+  df_n = pd.read_sql_query('SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN cadetes c ON n.id_legajo = c.id_legajo', conn)
+  df_e = pd.read_sql_query('SELECT e.*, c.apellido_nombre, c.curso, c.genero FROM examenes_periodicos e LEFT JOIN cadetes c ON e.id_legajo = c.id_legajo', conn)
+  df_i = pd.read_sql_query('SELECT i.*, c.apellido_nombre, c.curso FROM primera_intervencion i LEFT JOIN cadetes c ON i.id_legajo = c.id_legajo', conn)
   conn.close()
 
-  pendientes_alta = (
-      len(df_n[df_n['estado_alta'] == 'Pendiente']) if not df_n.empty else 0
-  )
+  pendientes_alta = len(df_n[df_n['estado_alta'] == 'Pendiente']) if not df_n.empty else 0
   col1, col2, col3, col4 = st.columns(4)
-  with col1:
-    st.markdown(kpi_card('🎓', len(df_c), 'Cadetes en compañía', '#38BDF8', 'Total en base de datos'), unsafe_allow_html=True)
-  with col2:
-    st.markdown(kpi_card('🩺', len(df_i), 'Intervenciones de guardia', '#A78BFA', 'Registradas en total'), unsafe_allow_html=True)
-  with col3:
-    st.markdown(kpi_card('🧑‍⚕️', len(df_p), 'Staff del gabinete', '#34D399', 'Personal activo'), unsafe_allow_html=True)
-  with col4:
-    st.markdown(kpi_card('⏳', pendientes_alta, 'Altas pendientes', '#FBBF24', 'Requieren convalidación'), unsafe_allow_html=True)
+  with col1: st.markdown(kpi_card('🎓', len(df_c), 'Cadetes en compañía', '#38BDF8', 'Total en base de datos'), unsafe_allow_html=True)
+  with col2: st.markdown(kpi_card('🩺', len(df_i), 'Intervenciones de guardia', '#A78BFA', 'Registradas en total'), unsafe_allow_html=True)
+  with col3: st.markdown(kpi_card('🧑‍⚕️', len(df_p), 'Staff del gabinete', '#34D399', 'Personal activo'), unsafe_allow_html=True)
+  with col4: st.markdown(kpi_card('⏳', pendientes_alta, 'Altas pendientes', '#FBBF24', 'Requieren convalidación'), unsafe_allow_html=True)
 
   st.markdown('<br>', unsafe_allow_html=True)
   dash_tab1, dash_tab2, dash_tab3 = st.tabs([
@@ -948,7 +655,6 @@ if menu == 'Dashboard General':
   ])
   with dash_tab1:
     from html import escape as _esc
-
     hoy = sec.ahora_local().date()
     alertas = construir_alertas(df_n, df_e, df_i, hoy)
     n_crit = sum(1 for a in alertas if a['nivel'] == 0)
@@ -956,628 +662,203 @@ if menu == 'Dashboard General':
     n_info = sum(1 for a in alertas if a['nivel'] == 2)
 
     k1, k2, k3 = st.columns(3)
-    with k1:
-      st.markdown(kpi_card('🚨', n_crit, 'Alertas críticas', '#EF4444', 'Acción inmediata'), unsafe_allow_html=True)
-    with k2:
-      st.markdown(kpi_card('⚠️', n_warn, 'Requieren atención', '#F59E0B', 'Seguimiento próximo'), unsafe_allow_html=True)
-    with k3:
-      st.markdown(kpi_card('🛌', n_info, 'Reposos vigentes', '#38BDF8', 'Informativo'), unsafe_allow_html=True)
+    with k1: st.markdown(kpi_card('🚨', n_crit, 'Alertas críticas', '#EF4444', 'Acción inmediata'), unsafe_allow_html=True)
+    with k2: st.markdown(kpi_card('⚠️', n_warn, 'Requieren atención', '#F59E0B', 'Seguimiento próximo'), unsafe_allow_html=True)
+    with k3: st.markdown(kpi_card('🛌', n_info, 'Reposos vigentes', '#38BDF8', 'Informativo'), unsafe_allow_html=True)
     st.markdown('<br>', unsafe_allow_html=True)
 
     f1, f2 = st.columns([2, 1])
     with f1:
-      niveles_sel = st.multiselect(
-          'Mostrar',
-          ['Críticas', 'Requieren atención', 'Informativas'],
-          default=['Críticas', 'Requieren atención'],
-      )
+      niveles_sel = st.multiselect('Mostrar', ['Críticas', 'Requieren atención', 'Informativas'], default=['Críticas', 'Requieren atención'])
     with f2:
       cursos = sorted({a['curso'] for a in alertas})
       curso_sel = st.selectbox('Curso', ['Todos'] + cursos)
 
     mapa_nivel = {'Críticas': 0, 'Requieren atención': 1, 'Informativas': 2}
     permitidos = {mapa_nivel[n] for n in niveles_sel}
-    visibles = [
-        a for a in alertas
-        if a['nivel'] in permitidos
-        and (curso_sel == 'Todos' or a['curso'] == curso_sel)
-    ]
+    visibles = [a for a in alertas if a['nivel'] in permitidos and (curso_sel == 'Todos' or a['curso'] == curso_sel)]
     iconos_nivel = {0: '🚨', 1: '⏰', 2: '🛌'}
     etiquetas_nivel = {0: 'Crítica', 1: 'Atención', 2: 'Informativa'}
 
-    # Cobertura de exámenes periódicos del año
     anio_actual = str(hoy.year)
-    con_examen = (
-        set(df_e.loc[df_e['anio'].astype(str) == anio_actual, 'id_legajo'].astype(str))
-        if not df_e.empty
-        else set()
-    )
+    con_examen = set(df_e.loc[df_e['anio'].astype(str) == anio_actual, 'id_legajo'].astype(str)) if not df_e.empty else set()
     ids_cadetes = set(df_c['id_legajo'].astype(str))
     con_examen &= ids_cadetes
     pct_cob = round(100 * len(con_examen) / len(ids_cadetes)) if ids_cadetes else 0
 
     col_izq, col_der = st.columns([2.1, 1], gap='large')
     with col_izq:
-      st.markdown(
-          '<div class="section-head"><div><div class="t">Centro de alertas</div>'
-          f'<div class="s">{len(visibles)} alerta(s) según los filtros'
-          ' seleccionados</div></div></div>',
-          unsafe_allow_html=True,
-      )
+      st.markdown(f'<div class="section-head"><div><div class="t">Centro de alertas</div><div class="s">{len(visibles)} alerta(s) según los filtros seleccionados</div></div></div>', unsafe_allow_html=True)
       if not visibles:
-        st.markdown(
-            '<div class="alert-ok"><span class="big">✅</span><div>Sin alertas'
-            ' para los filtros seleccionados.<br><span style="font-weight:400;'
-            ' opacity:.8;">Todo en orden.</span></div></div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="alert-ok"><span class="big">✅</span><div>Sin alertas para los filtros seleccionados.<br><span style="font-weight:400; opacity:.8;">Todo en orden.</span></div></div>', unsafe_allow_html=True)
       else:
         for a in visibles[:60]:
-          st.markdown(
-              f'<div class="al al-{a["nivel"]}"><div'
-              f' class="al-icon">{iconos_nivel[a["nivel"]]}</div><div'
-              f' class="al-main"><span'
-              f' class="al-pill">{etiquetas_nivel[a["nivel"]]} ·'
-              f' {_esc(a["tipo"])}</span><div'
-              f' class="al-name">{_esc(a["cadete"])}</div><div'
-              f' class="al-detail">{_esc(a["detalle"])}</div></div><div'
-              f' class="al-meta"><span class="tag">Curso'
-              f' {_esc(a["curso"])}</span><span class="tag">Legajo'
-              f' {_esc(a["legajo"])}</span></div></div>',
-              unsafe_allow_html=True,
-          )
+          st.markdown(f'<div class="al al-{a["nivel"]}"><div class="al-icon">{iconos_nivel[a["nivel"]]}</div><div class="al-main"><span class="al-pill">{etiquetas_nivel[a["nivel"]]} · {_esc(a["tipo"])}</span><div class="al-name">{_esc(a["cadete"])}</div><div class="al-detail">{_esc(a["detalle"])}</div></div><div class="al-meta"><span class="tag">Curso {_esc(a["curso"])}</span><span class="tag">Legajo {_esc(a["legajo"])}</span></div></div>', unsafe_allow_html=True)
         if len(visibles) > 60:
-          st.caption(f'Mostrando 60 de {len(visibles)} alertas. Filtre por curso para ver el resto.')
+          st.caption(f'Mostrando 60 de {len(visibles)} alertas.')
         df_alertas = pd.DataFrame(visibles).drop(columns=['nivel', 'orden'])
         df_alertas.columns = ['Cadete', 'Curso', 'Legajo', 'Tipo', 'Detalle']
-        st.download_button(
-            '⬇️ Descargar alertas (CSV)',
-            df_alertas.to_csv(index=False).encode('utf-8-sig'),
-            file_name=f'alertas_{hoy}.csv',
-            mime='text/csv',
-            on_click=sec.registrar_auditoria,
-            args=('Dashboard', 'EXPORT', f'Descarga CSV de alertas ({len(df_alertas)} filas)'),
-        )
+        st.download_button('⬇️ Descargar alertas (CSV)', df_alertas.to_csv(index=False).encode('utf-8-sig'), file_name=f'alertas_{hoy}.csv', mime='text/csv')
 
     with col_der:
-      # Actividad de guardia: últimos 14 días
-      dias_idx = pd.date_range(end=pd.Timestamp(hoy), periods=14)
-      conteo = {}
-      if not df_i.empty:
-        fechas = pd.to_datetime(df_i['fecha_hora'], errors='coerce').dt.normalize().dropna()
-        conteo = fechas.value_counts().to_dict()
-      serie = pd.DataFrame(
-          {'Intervenciones': [int(conteo.get(d, 0)) for d in dias_idx]},
-          index=dias_idx,
-      )
-      st.markdown(
-          '<div class="panel"><div class="panel-title">Actividad de guardia</div>'
-          f'<div class="panel-big">{int(serie["Intervenciones"].sum())}</div>'
-          '<div class="panel-note">intervenciones en los últimos 14 días</div></div>',
-          unsafe_allow_html=True,
-      )
-      try:
-        import altair as alt
+      st.markdown(f'<div class="panel"><div class="panel-title">Exámenes periódicos {anio_actual}</div><div class="panel-big">{pct_cob}%</div><div class="bar"><div style="width: {pct_cob}%;"></div></div><div class="panel-note">{len(con_examen)} de {len(ids_cadetes)} cadetes con examen</div></div>', unsafe_allow_html=True)
 
-        serie.index.name = 'Fecha'
-        df_graf = serie.reset_index()
-        y_max = max(1, int(serie['Intervenciones'].max()))
-        graf = (
-            alt.Chart(df_graf)
-            .mark_bar(color='#38BDF8', cornerRadiusTopLeft=4, cornerRadiusTopRight=4, size=14)
-            .encode(
-                x=alt.X('Fecha:T', axis=alt.Axis(
-                    format='%d/%m', title=None, grid=False, labelAngle=0,
-                    tickCount=5, labelColor='#8A97B1',
-                    domainColor='#1C2740', tickColor='#1C2740')),
-                y=alt.Y('Intervenciones:Q', scale=alt.Scale(domain=[0, y_max]),
-                        axis=alt.Axis(title=None, tickMinStep=1, labelColor='#8A97B1',
-                                      gridColor='#1C2740', domain=False, ticks=False)),
-                tooltip=[alt.Tooltip('Fecha:T', format='%d/%m/%Y'),
-                         alt.Tooltip('Intervenciones:Q')],
-            )
-            .properties(height=190, background='transparent')
-            .configure_view(strokeWidth=0)
-        )
-        st.altair_chart(graf, use_container_width=True, theme=None)
-      except Exception:
-        st.bar_chart(serie, color='#38BDF8', height=190)
-
-      st.markdown(
-          '<div class="panel"><div class="panel-title">Exámenes periódicos'
-          f' {anio_actual}</div><div class="panel-big">{pct_cob}%</div>'
-          f'<div class="bar"><div style="width: {pct_cob}%;"></div></div>'
-          f'<div class="panel-note">{len(con_examen)} de {len(ids_cadetes)}'
-          ' cadetes con examen registrado</div></div>',
-          unsafe_allow_html=True,
-      )
-
-    df_sin = df_c[~df_c['id_legajo'].astype(str).isin(con_examen)]
-    with st.expander(f'📋 Cadetes sin examen periódico {anio_actual} ({len(df_sin)})'):
-      st.dataframe(df_sin[['id_legajo', 'apellido_nombre', 'curso']], use_container_width=True)
   with dash_tab2:
-    st.markdown('### 👥 Consulta Rápida de Compañía de Cadetes')
+    st.markdown('### 👥 Consulta Rápida de Compañía')
     if not df_c.empty:
-      busq_dash = st.text_input(
-          '🔍 Filtrar por Apellido, Nombre o Número de Legajo en el Dashboard'
-      )
+      busq_dash = st.text_input('🔍 Filtrar por Apellido, Nombre o Legajo')
       df_c_view = df_c.copy()
       if busq_dash:
-        df_c_view = df_c_view[
-            df_c_view['apellido_nombre']
-            .str.contains(busq_dash, case=False, na=False)
-            | df_c_view['id_legajo']
-            .astype(str)
-            .str.contains(busq_dash, case=False, na=False)
-        ]
+        df_c_view = df_c_view[df_c_view['apellido_nombre'].str.contains(busq_dash, case=False, na=False) | df_c_view['id_legajo'].astype(str).str.contains(busq_dash, case=False, na=False)]
       st.dataframe(df_c_view, use_container_width=True)
   with dash_tab3:
-    st.markdown('### ⚙️ Administración e Institución')
-    if st.button('Sincronizar Base de Cadetes Ahora'):
-      exito, msg = importar_excel_directo()
-      if exito:
-        st.success(msg)
-        st.rerun()
-      else:
-        st.error(msg)
+    if st.button('Sincronizar Base de Cadetes'):
+      ex, ms = importar_excel_directo()
+      if ex: st.success(ms); st.rerun()
+      else: st.error(ms)
 
 elif menu == 'Gestión de Legajos':
-  st.markdown(
-      '<div class="pro-header"><p class="pro-title">📁 Gestión de Legajos de Cadetes</p><p class="pro-subtitle">Directorio institucional de compañía, altas manuales y control de legajos sanitarios.</p></div>',
-      unsafe_allow_html=True,
-  )
-  
-  df_c_gen = obtener_cadetes()
-  if not df_c_gen.empty:
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-      st.markdown(kpi_card('👥', len(df_c_gen), 'Total compañía', '#38BDF8'), unsafe_allow_html=True)
-    with c2:
-      c_1 = len(df_c_gen[df_c_gen['curso'].str.contains('1', na=False)])
-      st.markdown(kpi_card('1️⃣', c_1, 'Primer año', '#34D399'), unsafe_allow_html=True)
-    with c3:
-      c_2 = len(df_c_gen[df_c_gen['curso'].str.contains('2', na=False)])
-      st.markdown(kpi_card('2️⃣', c_2, 'Segundo año', '#FBBF24'), unsafe_allow_html=True)
-    with c4:
-      c_3 = len(df_c_gen[df_c_gen['curso'].str.contains('3', na=False)])
-      st.markdown(kpi_card('3️⃣', c_3, 'Tercer año', '#A78BFA'), unsafe_allow_html=True)
-  
-  st.markdown('<br>', unsafe_allow_html=True)
-  tab1, tab2 = st.tabs(['🔍 Consultar / Listar Compañía', '➕ Registrar Nuevo Cadete'])
-  
-  with tab1:
-    st.markdown('<br>', unsafe_allow_html=True)
-    col_t1, col_t2 = st.columns([3, 1])
-    with col_t1:
-      busqueda = st.text_input('🔍 Búsqueda rápida por Apellido, Nombre o Número de Legajo/Cargo', placeholder='Escriba para filtrar...')
-    with col_t2:
-      st.markdown('<div style="margin-top: 1.8rem;"></div>', unsafe_allow_html=True)
-      if st.button('🔄 Sincronizar con Excel', disabled=not sec.tiene_permiso('sincronizar_excel')) and sec.exigir('sincronizar_excel'):
-        ex, ms = importar_excel_directo()
-        if ex: sec.registrar_auditoria('Legajos', 'INSERT', f'Sincronización con Excel: {ms}'); st.success(ms); st.rerun()
-        else: st.error(ms)
-        
-    df_cadetes = obtener_cadetes()
-    if not df_cadetes.empty:
-      if busqueda:
-        df_cadetes = df_cadetes[
-            df_cadetes['apellido_nombre'].str.contains(busqueda, case=False, na=False)
-            | df_cadetes['id_legajo'].astype(str).str.contains(busqueda, case=False, na=False)
-            | df_cadetes['dni'].astype(str).str.contains(busqueda, case=False, na=False)
-        ]
-      
-      if not sec.tiene_permiso('ver_legajos_completo'):
-        df_cadetes = df_cadetes[['id_legajo', 'apellido_nombre', 'curso']]
-      st.markdown('<div class="panel">', unsafe_allow_html=True)
-      st.dataframe(df_cadetes, use_container_width=True)
-      st.markdown('</div>', unsafe_allow_html=True)
-      
-      # Descarga CSV (solo roles con permiso de exportación)
-      if sec.tiene_permiso('exportar_legajos'):
-        st.download_button(
-            '⬇️ Descargar listado completo (CSV)',
-            df_cadetes.to_csv(index=False).encode('utf-8-sig'),
-            file_name=f'cadetes_iesp_{sec.ahora_local().date()}.csv',
-            mime='text/csv',
-            on_click=sec.registrar_auditoria,
-            args=('Legajos', 'EXPORT', f'Descarga CSV del listado de cadetes ({len(df_cadetes)} filas)'),
-        )
-    else:
-      st.warning('No hay cadetes en la base de datos.')
-      
-  with tab2:
-    if not sec.tiene_permiso('alta_cadete'):
-      st.info('Su rol no permite registrar nuevos legajos.')
-      st.stop()
-    st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown('<div class="panel"><h3>Formulario de Alta Manual de Cadete</h3><p style="color: var(--muted); font-size: 0.88rem;">Complete los datos obligatorios para incorporar un nuevo legajo al sistema institucional.</p></div>', unsafe_allow_html=True)
-    
-    with st.form('form_nuevo_cadete'):
-      col1, col2 = st.columns(2, gap='medium')
-      with col1:
-        id_legajo = st.text_input('Número de Legajo / Cargo *', placeholder='Ej: 20505').strip()
-        apellido_nombre = st.text_input('Apellido y Nombres *', placeholder='Ej: PÉREZ, JUAN CARLOS').strip()
-        curso = st.selectbox('Curso / Año', ['1 AÑO', '2 AÑO', '3 AÑO'])
-      with col2:
-        dni = st.text_input('Documento Nacional de Identidad (DNI)', placeholder='Ej: 42356789').strip()
-        genero = st.selectbox('Género', ['Masculino', 'Femenino', 'Otro'])
-        fecha_nacimiento = st.date_input('Fecha de Nacimiento', value=date(2002, 1, 1))
-        
-      observaciones = st.text_area('Observaciones / Contacto / Antecedentes Sanitarios', placeholder='Email, celular, grupo sanguíneo, etc.')
-      
-      st.markdown('<br>', unsafe_allow_html=True)
-      if st.form_submit_button('💾 Guardar Legajo Institucional') and sec.exigir('alta_cadete'):
-        if id_legajo and apellido_nombre:
-          try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(
-                'INSERT INTO cadetes VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (
-                    id_legajo,
-                    apellido_nombre,
-                    curso,
-                    dni,
-                    genero,
-                    str(fecha_nacimiento),
-                    observaciones,
-                ),
-            )
-            conn.commit()
-            conn.close()
-            sec.registrar_auditoria('Legajos', 'INSERT', f'Alta de cadete legajo {id_legajo} (curso {curso})', id_legajo)
-            st.success(f'¡Legajo {id_legajo} de {apellido_nombre} guardado con éxito!')
-          except sqlite3.IntegrityError:
-            st.error('Error: El número de legajo ya existe en la base de datos.')
-        else:
-          st.warning('Debe completar obligatoriamente el Número de Legajo y los Apellidos y Nombres.')
-
-elif menu == 'Personal del Gabinete':
-  st.markdown(
-      '<div class="pro-header"><p class="pro-title">👥 Staff Médico y Personal del Gabinete</p><p class="pro-subtitle">Directorio institucional de profesionales, matrículas y gestión de altas/bajas.</p></div>',
-      unsafe_allow_html=True,
-  )
-  
-  df_p_gen = obtener_personal()
-  if not df_p_gen.empty:
-    cp1, cp2, cp3 = st.columns(3)
-    with cp1:
-      st.markdown(kpi_card('🧑‍⚕️', len(df_p_gen), 'Total staff activo', '#38BDF8'), unsafe_allow_html=True)
-    with cp2:
-      medicos_count = len(df_p_gen[df_p_gen['especialidad'].str.contains('Médico', case=False, na=False)])
-      st.markdown(kpi_card('🩺', medicos_count, 'Médicos / Clínicos', '#34D399'), unsafe_allow_html=True)
-    with cp3:
-      psi_count = len(df_p_gen[df_p_gen['especialidad'].str.contains('Psicó|Psiquiatra|Psicopedagogo', case=False, na=False)])
-      st.markdown(kpi_card('🧠', psi_count, 'Salud Mental / Psico', '#A78BFA'), unsafe_allow_html=True)
-  
-  st.markdown('<br>', unsafe_allow_html=True)
-  tab_p1, tab_p2 = st.tabs(['📋 Listado de Staff', '➕ Alta / Baja de Personal'])
-  
-  with tab_p1:
-    st.markdown('<br>', unsafe_allow_html=True)
-    df_personal = obtener_personal()
-    if not df_personal.empty:
-      st.markdown('<div class="panel">', unsafe_allow_html=True)
-      st.dataframe(df_personal, use_container_width=True)
-      st.markdown('</div>', unsafe_allow_html=True)
-    else:
-      st.info('No hay personal del gabinete registrado todavía.')
-      
-  with tab_p2:
-    if not sec.tiene_permiso('gestionar_personal'):
-      st.info('Solo los administradores pueden dar de alta o baja al personal.')
-      st.stop()
-    st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown('<div class="panel"><h3>Registro de Nuevo Profesional</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese la información requerida, matrícula y el cargo o especialidad institucional.</p></div>', unsafe_allow_html=True)
-    
-    with st.form('form_personal'):
-      col1, col2 = st.columns(2, gap='medium')
-      with col1:
-        leg_pers = st.text_input('Número de Legajo / ID Personal *', placeholder='Ej: P-4521').strip()
-        ap_nom_pers = st.text_input('Apellido y Nombres *', placeholder='Ej: LÓPEZ, AGOSTINA').strip()
-        dni_pers = st.text_input('DNI', placeholder='Ej: 32132121').strip()
-      with col2:
-        mat_pers = st.text_input('Matrícula Profesional *', placeholder='Ej: MP-12312 (o S/M)').strip()
-        esp_pers = st.text_input('Especialidad / Cargo / Rango *', placeholder='Ej: Comisario / Jefa / Médico Clínico').strip()
-        tel_pers = st.text_input('Teléfono de Contacto', placeholder='Ej: 3816545454').strip()
-        
-      st.markdown('<br>', unsafe_allow_html=True)
-      if st.form_submit_button('💾 Registrar Profesional en Staff') and sec.exigir('gestionar_personal'):
-        if leg_pers and ap_nom_pers and mat_pers and esp_pers:
-          try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            _existia = cursor.execute('SELECT 1 FROM personal_gabinete WHERE id_legajo_personal = ?', (leg_pers,)).fetchone() is not None
-            cursor.execute(
-                'INSERT OR REPLACE INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)',
-                (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers),
-            )
-            conn.commit()
-            conn.close()
-            sec.registrar_auditoria('Personal', 'UPDATE' if _existia else 'INSERT', f'{"Actualización" if _existia else "Alta"} de profesional {leg_pers}', leg_pers)
-            st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
-            st.rerun()
-          except sqlite3.OperationalError as e:
-            st.error(f'Error de base de datos: {e}')
-            # Auto-migración por si la tabla personal_gabinete carece de alguna columna
-            try:
-              cursor.execute('CREATE TABLE IF NOT EXISTS personal_gabinete (id_legajo_personal TEXT PRIMARY KEY, apellido_nombre TEXT NOT NULL, dni TEXT, matricula TEXT, especialidad TEXT, telefono TEXT)')
-              for col, col_t in [('id_legajo_personal', 'TEXT PRIMARY KEY'), ('apellido_nombre', 'TEXT'), ('dni', 'TEXT'), ('matricula', 'TEXT'), ('especialidad', 'TEXT'), ('telefono', 'TEXT')]:
-                try: cursor.execute(f'ALTER TABLE personal_gabinete ADD COLUMN {col} {col_t};')
-                except Exception: pass
-              cursor.execute('INSERT OR REPLACE INTO personal_gabinete VALUES (?, ?, ?, ?, ?, ?)', (leg_pers, ap_nom_pers, dni_pers, mat_pers, esp_pers, tel_pers))
-              conn.commit()
-              conn.close()
-              sec.registrar_auditoria('Personal', 'INSERT', f'Alta/actualización de profesional {leg_pers} (reparación de tabla)', leg_pers)
-              st.success(f'¡Profesional {ap_nom_pers} registrado con éxito!')
-              st.rerun()
-            except Exception as ex:
-              st.error(f'Error crítico al guardar: {ex}')
-        else:
-          st.warning('Complete los campos obligatorios (*).')
-          
-    st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown('<div class="panel"><h3>Baja de Personal</h3><p style="color: var(--muted); font-size: 0.88rem;">Seleccione el profesional que dejará de formar parte del staff activo del gabinete.</p></div>', unsafe_allow_html=True)
-    
-    df_pers_del = obtener_personal()
-    if not df_pers_del.empty:
-      lista_del = (
-          df_pers_del['id_legajo_personal'].astype(str)
-          + ' - '
-          + df_pers_del['apellido_nombre']
-          + ' ('
-          + df_pers_del['especialidad']
-          + ')'
-      ).tolist()
-      with st.form('form_baja_personal'):
-        sel_del = st.selectbox('Seleccione el Profesional', lista_del)
-        st.markdown('<br>', unsafe_allow_html=True)
-        if st.form_submit_button('🗑️ Confirmar Baja del Staff') and sec.exigir('gestionar_personal'):
-          id_elim = sel_del.split(' - ')[0]
-          conn = sqlite3.connect(DB_NAME)
-          cursor = conn.cursor()
-          cursor.execute('DELETE FROM personal_gabinete WHERE id_legajo_personal = ?', (id_elim,))
-          conn.commit()
-          conn.close()
-          sec.registrar_auditoria('Personal', 'DELETE', f'Baja de profesional {id_elim}', id_elim)
-          st.success('¡Personal dado de baja correctamente!')
-          st.rerun()
-
-elif menu == '1. Primera Intervención':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">🩺 Primera Intervención en Gabinete</h2>',
-      unsafe_allow_html=True,
-  )
-  df_cadetes = obtener_cadetes()
-  df_personal = obtener_personal()
-  if df_cadetes.empty:
-    st.warning('No hay cadetes.')
-  else:
-    lista_cadetes = (
-        df_cadetes['id_legajo'].astype(str)
-        + ' - '
-        + df_cadetes['apellido_nombre']
-    ).tolist()
-    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
-    id_legajo = seleccion.split(' - ')[0]
-    cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[
-        0
-    ]
-    st.markdown(
-        f'<div class="profile-card"><h3 style="margin: 0; color:'
-        f' #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin:'
-        f' 0.25rem 0 0 0; color: #94A3B8;">Legajo:'
-        f' <b>{cad_sel["id_legajo"]}</b> | Curso: <b>{cad_sel["curso"]}</b> |'
-        f' DNI: <b>{cad_sel["dni"]}</b></p></div>',
-        unsafe_allow_html=True,
-    )
-    lista_profesionales = (
-        df_personal['apellido_nombre'].tolist()
-        if not df_personal.empty
-        else ['Sin personal registrado']
-    )
-    with st.form('form_intervencion'):
-      col1, col2 = st.columns(2)
-      with col1:
-        hora_arg = sec.ahora_local().strftime('%Y-%m-%d %H:%M')
-        fecha_hora = st.text_input('Fecha y Hora', value=hora_arg)
-        profesional_atiende = st.selectbox(
-            'Profesional que Atiende*', lista_profesionales,
-            index=sec.indice_profesional(lista_profesionales, df_personal),
-        )
-        sintomas = st.text_area('Síntomas / Motivo*')
-      with col2:
-        presion = st.text_input('Presión Arterial', placeholder='Ej: 120/80')
-        saturacion = st.text_input('Saturación O2', placeholder='Ej: 98%')
-        temperatura = st.text_input('Temperatura (°C)', placeholder='Ej: 36.5')
-        derivacion = st.selectbox(
-            'Derivación / Especialista*',
-            [
-                'Clínica Central',
-                'Traumatología',
-                'Cardiología',
-                'Psicología',
-                'Oftalmología',
-                'Odontología',
-                'Otro',
-            ],
-        )
-        derivacion_detalles = st.text_input('Detalles específicos')
-      if st.form_submit_button('Registrar Intervención') and sec.exigir('primera_intervencion'):
-        if profesional_atiende and sintomas and derivacion:
-          derivacion_final = (
-              f'{derivacion} - {derivacion_detalles}'
-              if derivacion_detalles
-              else derivacion
-          )
-          conn = sqlite3.connect(DB_NAME)
-          cursor = conn.cursor()
-          guardado = False
-          try:
-            cursor.execute(
-                'INSERT INTO primera_intervencion (id_legajo, fecha_hora,'
-                ' profesional_atiende, sintomas, presion, saturacion,'
-                ' derivacion, temperatura) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                (
-                    id_legajo,
-                    fecha_hora,
-                    profesional_atiende,
-                    sintomas,
-                    presion,
-                    saturacion,
-                    derivacion_final,
-                    temperatura,
-                ),
-            )
-            conn.commit()
-            nuevo_id = cursor.lastrowid
-            guardado = True
-          except sqlite3.OperationalError as e:
-            st.error(f'Error de base de datos: {e}')
-            cols = [
-                r[1]
-                for r in cursor.execute(
-                    'PRAGMA table_info(primera_intervencion)'
-                ).fetchall()
-            ]
-            st.code(f'Columnas actuales: {cols}')
-          finally:
-            conn.close()
-          if guardado:
-            sec.registrar_auditoria('Primera Intervención', 'INSERT', f'Intervención #{nuevo_id} (derivación: {derivacion})', id_legajo)
-            st.success('¡Intervención registrada!')
-            st.rerun()
-        else:
-          st.warning('Complete campos obligatorios.')
-  st.markdown('### 📊 Historial')
-  conn = sqlite3.connect(DB_NAME)
-  df_ints = pd.read_sql_query(
-      'SELECT * FROM primera_intervencion WHERE id_legajo = ?',
-      conn,
-      params=(id_legajo,),
-  )
-  conn.close()
-  if not df_ints.empty:
-    st.dataframe(df_ints, use_container_width=True)
-
-elif menu == '2. Notas Médicas y Reposos':
-  st.markdown(
-      '<h2 style="color: #FFFFFF;">📋 Registro de Notas Médicas, Certificados y'
-      ' Estudios</h2>',
-      unsafe_allow_html=True,
-  )
+  st.markdown('<div class="pro-header"><p class="pro-title">📁 Gestión de Legajos</p></div>', unsafe_allow_html=True)
   df_cadetes = obtener_cadetes()
   if not df_cadetes.empty:
-    lista_cadetes = (
-        df_cadetes['id_legajo'].astype(str)
-        + ' - '
-        + df_cadetes['apellido_nombre']
-    ).tolist()
-    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
-    id_legajo = seleccion.split(' - ')[0]
-    cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_legajo].iloc[
-        0
-    ]
+    busqueda = st.text_input('🔍 Buscar por Apellido o Legajo')
+    if busqueda:
+      df_cadetes = df_cadetes[df_cadetes['apellido_nombre'].str.contains(busqueda, case=False, na=False) | df_cadetes['id_legajo'].astype(str).str.contains(busqueda, case=False, na=False)]
+    st.dataframe(df_cadetes, use_container_width=True)
+
+elif menu == 'Personal del Gabinete':
+  st.markdown('<div class="pro-header"><p class="pro-title">👥 Staff Médico</p></div>', unsafe_allow_html=True)
+  df_personal = obtener_personal()
+  if not df_personal.empty:
+    st.dataframe(df_personal, use_container_width=True)
+  else:
+    st.info('Sin personal registrado.')
+
+elif menu == '1. Primera Intervención':
+  st.markdown('## 🩺 Primera Intervención en Guardia')
+  df_c = obtener_cadetes()
+  df_p = obtener_personal()
+  if not df_c.empty:
+    lista_c = (df_c['id_legajo'].astype(str) + ' - ' + df_c['apellido_nombre']).tolist()
+    sel = st.selectbox('Cadete', lista_c)
+    id_leg = sel.split(' - ')[0]
+    lista_prof = df_p['apellido_nombre'].tolist() if not df_p.empty else ['Sin personal']
+    with st.form('f_int'):
+      f_h = st.text_input('Fecha y Hora', value=sec.ahora_local().strftime('%Y-%m-%d %H:%M'))
+      prof = st.selectbox('Profesional', lista_prof)
+      sint = st.text_area('Síntomas')
+      pres = st.text_input('Presión')
+      sat = st.text_input('Saturación')
+      temp = st.text_input('Temperatura (°C)')
+      der = st.selectbox('Derivación', ['Clínica', 'Traumatología', 'Psicología', 'Otro'])
+      if st.form_submit_button('Registrar') and sec.exigir('primera_intervencion'):
+        conn = sqlite3.connect(DB_NAME)
+        conn.execute('INSERT INTO primera_intervencion (id_legajo, fecha_hora, profesional_atiende, sintomas, presion, saturacion, temperatura, derivacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                     (id_leg, f_h, prof, sint, pres, sat, temp, der))
+        conn.commit()
+        conn.close()
+        sec.registrar_auditoria('Intervención', 'INSERT', 'Intervención guardada', id_leg)
+        st.success('Registrado con éxito!')
+        st.rerun()
+
+elif menu == '2. Notas Médicas y Reposos':
+  st.markdown('## 📋 Registro de Notas Médicas y Reposos')
+  df_cadetes = obtener_cadetes()
+  if not df_cadetes.empty:
+    lista_c = (df_cadetes['id_legajo'].astype(str) + ' - ' + df_cadetes['apellido_nombre']).tolist()
+    sel = st.selectbox('Cadete', lista_c)
+    id_leg = sel.split(' - ')[0]
+    cad_sel = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_leg].iloc[0]
     st.markdown(
-        f'<div class="profile-card"><h3 style="margin: 0; color:'
-        f' #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin:'
-        f' 0.25rem 0 0 0; color: #94A3B8;">Legajo: <b>{cad_sel["id_legajo"]}</b>'
-        f' | Curso: <b>{cad_sel["curso"]}</b></p></div>',
+        f'<div class="profile-card"><h3 style="margin: 0; color: #FFFFFF;">{cad_sel["apellido_nombre"]}</h3><p style="margin: 0.25rem 0 0 0; color: #94A3B8;">Legajo: <b>{cad_sel["id_legajo"]}</b> | Curso: <b>{cad_sel["curso"]}</b></p></div>',
         unsafe_allow_html=True,
     )
-    with st.form('form_nota_medica'):
+    
+    with st.form('form_nota', clear_on_submit=True):
       col1, col2 = st.columns(2)
       with col1:
-        nro_expediente = st.text_input(
-            'Número de Expediente* (Ej: EXP-2026-XX)'
-        )
-        medico = st.text_input('Médico Tratante / Matrícula*')
-        diagnostico = st.text_area('Diagnóstico Médico*')
-        tipo_reposo = st.selectbox(
-            'Tipo de Reposo',
-            ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'],
-        )
+        nro_exp = st.text_input('Número de Expediente* (Ej: EXP-2026-XX)')
+        med = st.text_input('Médico Tratante / Matrícula*')
+        diag = st.text_area('Diagnóstico Médico*')
+        tipo_rep = st.selectbox('Tipo de Reposo', ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'])
       with col2:
-        fecha_desde = st.date_input('Reposo Desde', value=sec.ahora_local().date())
-        fecha_hasta = st.date_input('Reposo Hasta', value=sec.ahora_local().date())
-        certificados_indicaciones = st.text_area(
-            'Certificados e Indicaciones Médicas'
-        )
-        analisis_estudios = st.text_area(
-            'Análisis de Laboratorio y Estudios Complementarios'
-        )
+        f_des = st.date_input('Reposo Desde', value=sec.ahora_local().date())
+        f_has = st.date_input('Reposo Hasta', value=sec.ahora_local().date())
+        cert = st.text_area('Certificados e Indicaciones Médicas')
+        anal = st.text_area('Análisis y Estudios Complementarios')
+      
       medicamentos = st.text_input('Medicamentos Recetados')
-      submitted_nota = st.form_submit_button('Guardar Nota Médica y Expediente')
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      uploaded_file = st.file_uploader(
+          '📎 Adjuntar Archivo PDF Externo (Certificado / Análisis / Estudio escaneado)',
+          type=['pdf'],
+      )
+      
+      st.markdown('<br>', unsafe_allow_html=True)
+      submitted_nota = st.form_submit_button('💾 Guardar Nota Médica y Expediente')
 
-    uploaded_file = st.file_uploader(
-        '📎 Adjuntar Archivo PDF Externo (Certificado / Análisis / Estudio'
-        ' escaneado)',
-        type=['pdf'],
-    )
-    uploaded_file = sec.validar_pdf(uploaded_file)
-
-    if submitted_nota and sec.exigir('notas_medicas'):
-      if nro_expediente and medico and diagnostico:
+    if submitted_nota:
+      uploaded_file_valid = sec.validar_pdf(uploaded_file)
+      if nro_exp and med and diag:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute(
             """
-                    INSERT INTO notas_medicas (id_legajo, nro_expediente, medico, diagnostico, tipo_reposo, fecha_desde, fecha_hasta, medicamentos, certificados_indicaciones, analisis_estudios, estado_alta)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
-                """,
+                INSERT INTO notas_medicas (id_legajo, nro_expediente, medico, diagnostico, tipo_reposo, fecha_desde, fecha_hasta, medicamentos, certificados_indicaciones, analisis_estudios, estado_alta)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+            """,
             (
-                id_legajo,
-                nro_expediente,
-                medico,
-                diagnostico,
-                tipo_reposo,
-                str(fecha_desde),
-                str(fecha_hasta),
+                id_leg,
+                nro_exp,
+                med,
+                diag,
+                tipo_rep,
+                str(f_des),
+                str(f_has),
                 medicamentos,
-                certificados_indicaciones,
-                analisis_estudios,
+                cert,
+                anal,
             ),
         )
         conn.commit()
         nota_dict = {
-            'nro_expediente': nro_expediente,
-            'medico': medico,
-            'diagnostico': diagnostico,
-            'tipo_reposo': tipo_reposo,
-            'fecha_desde': str(fecha_desde),
-            'fecha_hasta': str(fecha_hasta),
+            'nro_expediente': nro_exp,
+            'medico': med,
+            'diagnostico': diag,
+            'tipo_reposo': tipo_rep,
+            'fecha_desde': str(f_des),
+            'fecha_hasta': str(f_has),
             'medicamentos': medicamentos,
-            'certificados_indicaciones': certificados_indicaciones,
-            'analisis_estudios': analisis_estudios,
+            'certificados_indicaciones': cert,
+            'analisis_estudios': anal,
         }
         pdf_path = generar_pdf_legajo(cad_sel, nota_dict)
         cursor.execute(
-            'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
-            ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+            'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones)'
             ' VALUES (?, ?, ?, ?, ?, ?)',
             (
-                id_legajo,
-                f'Expediente {nro_expediente} - Nota Médica y Certificado',
+                id_leg,
+                f'Expediente {nro_exp} - Nota Médica y Certificado',
                 'PDF Oficial',
                 str(sec.ahora_local().date()),
                 pdf_path,
                 'Generado automáticamente',
             ),
         )
-        if uploaded_file is not None:
+        if uploaded_file_valid is not None:
           ext_path = os.path.join(
               UPLOAD_DIR,
-              sec.nombre_seguro(f'{id_legajo}_{nro_expediente}_{uploaded_file.name}'),
+              sec.nombre_seguro(f'{id_leg}_{nro_exp}_{uploaded_file_valid.name}'),
           )
           with open(ext_path, 'wb') as f_ext:
-            f_ext.write(uploaded_file.getbuffer())
+            f_ext.write(uploaded_file_valid.getbuffer())
           cursor.execute(
-              'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
-              ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+              'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones)'
               ' VALUES (?, ?, ?, ?, ?, ?)',
               (
-                  id_legajo,
-                  f'Expediente {nro_expediente} - Archivo Externo Adjunto',
+                  id_leg,
+                  f'Expediente {nro_exp} - Archivo Externo Adjunto',
                   'PDF Externo',
                   str(sec.ahora_local().date()),
                   ext_path,
@@ -1586,20 +867,48 @@ elif menu == '2. Notas Médicas y Reposos':
           )
         conn.commit()
         conn.close()
-        sec.registrar_auditoria('Notas Médicas', 'INSERT', f'Nota médica / expediente {nro_expediente} ({tipo_reposo}, {fecha_desde} a {fecha_hasta})', id_legajo)
-        sec.registrar_auditoria('Documentos', 'INSERT', f'PDF oficial generado: {os.path.basename(pdf_path)} (exp. {nro_expediente})', id_legajo)
-        if uploaded_file is not None:
-          sec.registrar_auditoria('Documentos', 'INSERT', f'PDF externo subido: {os.path.basename(ext_path)} (exp. {nro_expediente})', id_legajo)
-        st.success(
-            '¡Nota médica y documentación PDF anexadas con éxito al legajo'
-            ' digital!'
-        )
+        sec.registrar_auditoria('Notas Médicas', 'INSERT', f'Nota médica / expediente {nro_exp} registrado', id_leg)
+        
+        # Generamos el texto institucional exacto para WhatsApp
+        hora_actual_str = sec.ahora_local().strftime('%H:%M')
+        fecha_actual_str = fecha_larga_es(sec.ahora_local().date())
+        usuario_que_informa = (st.session_state.get('auth_user') or {}).get('nombre_completo', 'Personal de Guardia')
+        
+        texto_wa = f"""🇦🇷 *Dirección de Gabinete Interdisciplinario de Asesoramiento Psicopedagógico y Psicológico* 🇦🇷
+➖➖➖➖➖➖➖➖
+🇦🇷 *GUARDIA MEDICA* 🇦🇷
+➖➖➖➖➖➖➖
+*FECHA:* {fecha_actual_str}
+ 
+_______________________
+*Ref.:* Nota Medica
+ 
+Para conocimiento de la Superioridad, en el día de la fecha, siendo horas {hora_actual_str} se hizo presente en el recinto de guardia el/la cadete de {cad_sel['curso']} {cad_sel['apellido_nombre']} (Legajo: {cad_sel['id_legajo']}) quien presenta certificado medico expedido por {med} en el cual diagnóstica {diag}, con reposo por {tipo_rep} a partir de la fecha (Expediente Nro: {nro_exp}).
+
+*Obs:* {cert if cert else 'Sin observaciones adicionales'}.
+
+➖➖➖➖➖➖➖➖
+*SUPERVISOR GENERAL:* 
+Comisario Correa María de los Angeles
+_*(Directora del D.G.I.A.P.P.")*_
+
+*INFORMA:*
+{usuario_que_informa}"""
+
+        st.success('✅ ¡Nota médica guardada con éxito, expediente generado y campos limpios!')
+        st.markdown('### 📱 Parte Institucional para WhatsApp')
+        st.info('Copie el siguiente texto o presione el botón para enviarlo directamente por WhatsApp.')
+        st.code(texto_wa, language='markdown')
+        
+        import urllib.parse
+        wa_link = f"https://wa.me/?text={urllib.parse.quote(texto_wa)}"
+        st.markdown(f'<a href="{wa_link}" target="_blank"><button style="background-color:#25D366; color:white; padding:0.6rem 1.4rem; border:none; border-radius:12px; font-weight:700; cursor:pointer; font-size:1rem;">💬 Enviar Parte por WhatsApp</button></a>', unsafe_allow_html=True)
       else:
         st.warning('Complete los campos obligatorios (*).')
 
 elif menu == '3. Control de Alta':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide el alta médica reglamentaria adjuntando el certificado oficial o registre extensiones de reposo.</p></div>',
+      '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide altas, gestione prórrogas con nuevo número de expediente vinculado y asigne exámenes complementarios pendientes.</p></div>',
       unsafe_allow_html=True,
   )
 
@@ -1612,8 +921,8 @@ elif menu == '3. Control de Alta':
   conn.close()
 
   alta_tab1, alta_tab2 = st.tabs([
-      '1️⃣ Convalidar Alta Médica y Adjuntar Certificado',
-      '2️⃣ Extensión de Reposo / Prórroga',
+      '1️⃣ Convalidar Alta Médica y Exámenes Pendientes',
+      '2️⃣ Prórroga / Extensión (Nuevo Expediente Vinculado)',
   ])
 
   with alta_tab1:
@@ -1637,7 +946,7 @@ elif menu == '3. Control de Alta':
       cadetes_alta_lista = (df_pendientes['id'].astype(str) + " - " + df_pendientes['apellido_nombre'] + " (Exp: " + df_pendientes['nro_expediente'] + ")").tolist()
       
       st.markdown('<br>', unsafe_allow_html=True)
-      st.markdown('<div class="panel"><h3>Formulario Oficial de Alta Médica</h3><p style="color: var(--muted); font-size: 0.88rem;">Ingrese los datos del médico otorgante y adjunte el certificado PDF correspondiente.</p></div>', unsafe_allow_html=True)
+      st.markdown('<div class="panel"><h3>Formulario Oficial de Convalidación de Alta</h3></div>', unsafe_allow_html=True)
       
       sel_alta_form = st.selectbox('Seleccione el Expediente para Convalidar Alta', cadetes_alta_lista, key='sel_alta_form_unique')
       exp_id = int(sel_alta_form.split(' - ')[0])
@@ -1649,20 +958,33 @@ elif menu == '3. Control de Alta':
           medico_alta = st.text_input('Médico Tratante / Matrícula que otorga el Alta *', placeholder='Ej: Dr. Gómez / MP-4521').strip()
           fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=sec.ahora_local().date())
         with col_a2:
-          observaciones_alta = st.text_area('Observaciones Clínicas de Alta / Aptitud', placeholder='Paciente recuperado, sin secuelas, apto para retomar actividades.')
+          observaciones_alta = st.text_area('Observaciones Clínicas de Alta / Aptitud', placeholder='Paciente recuperado, apto para retomar actividades.')
+          
+        st.markdown('#### 🔬 Solicitud de Examen Médico Complementario (Opcional)')
+        solicitar_examen = st.checkbox('¿Solicitar examen médico complementario pendiente al dar el alta?')
+        detalle_examen = st.text_input('Detalle del examen solicitado (Ej: Hemograma de control, Placa de tórax, etc.)', placeholder='Especifique el estudio...')
         
         uploaded_alta_pdf = st.file_uploader('📎 Adjuntar Certificado de Alta Médico (PDF)', type=['pdf'], key='up_alta_pdf')
         uploaded_alta_pdf = sec.validar_pdf(uploaded_alta_pdf)
         
         st.markdown('<br>', unsafe_allow_html=True)
-        if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Archivar') and sec.exigir('control_alta'):
+        if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Registrar Pendientes') and sec.exigir('control_alta'):
           if medico_alta:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
+            
+            try: cursor.execute("ALTER TABLE notas_medicas ADD COLUMN examen_pendiente TEXT;")
+            except Exception: pass
+            
+            estado_final_alta = 'Alta Convalidada'
+            obs_finales = observaciones_alta
+            if solicitar_examen and detalle_examen:
+              obs_finales += f" | ⚠️ Examen Complementario PENDIENTE: {detalle_examen}"
+              
             cursor.execute(
-                "UPDATE notas_medicas SET estado_alta = 'Alta Convalidada', fecha_alta_efectiva = ?,"
+                "UPDATE notas_medicas SET estado_alta = ?, fecha_alta_efectiva = ?,"
                 " medico_alta = ?, observaciones_alta = ? WHERE id = ? AND estado_alta = 'Pendiente'",
-                (str(fecha_alta_efectiva), medico_alta, observaciones_alta, exp_id),
+                (estado_final_alta, str(fecha_alta_efectiva), medico_alta, obs_finales, exp_id),
             )
             _alta_aplicada = cursor.rowcount > 0
             
@@ -1671,18 +993,16 @@ elif menu == '3. Control de Alta':
               with open(alta_path, 'wb') as f_al:
                 f_al.write(uploaded_alta_pdf.getbuffer())
               cursor.execute('INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
-                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta Médica", 'PDF Alta', str(sec.ahora_local().date()), alta_path, f"Médico: {medico_alta} | {observaciones_alta}"))
+                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta", 'PDF Alta', str(sec.ahora_local().date()), alta_path, f"Médico: {medico_alta}"))
             
             conn.commit()
             conn.close()
             if _alta_aplicada:
-              sec.registrar_auditoria('Control de Alta', 'UPDATE', f"Alta convalidada exp. {exp_row['nro_expediente']} (fecha efectiva {fecha_alta_efectiva}; estado Pendiente → Alta Convalidada)", exp_row['id_legajo'])
-              if uploaded_alta_pdf is not None:
-                sec.registrar_auditoria('Documentos', 'INSERT', f"Certificado de alta PDF subido: {os.path.basename(alta_path)} (exp. {exp_row['nro_expediente']})", exp_row['id_legajo'])
-              st.success('¡Alta médica convalidada y certificado PDF archivado con éxito en el legajo!')
+              sec.registrar_auditoria('Control de Alta', 'UPDATE', f"Alta convalidada exp. {exp_row['nro_expediente']}. Examen pendiente: {detalle_examen if solicitar_examen else 'Ninguno'}", exp_row['id_legajo'])
+              st.success('✅ ¡Alta médica convalidada con éxito! El estado y los exámenes pendientes han sido registrados en el legajo.')
               st.rerun()
             else:
-              st.warning('Este expediente ya no figura como pendiente (¿ya fue convalidado?). Actualice la página.')
+              st.warning('Este expediente ya no figura como pendiente. Actualice la página.')
           else:
             st.warning('Debe completar el nombre o matrícula del médico que otorga el alta.')
     else:
@@ -1690,11 +1010,9 @@ elif menu == '3. Control de Alta':
 
   with alta_tab2:
     st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown('### Registro de Prórroga o Más Días de Reposo')
+    st.markdown('### 📑 Registro de Prórroga (Generación de Nuevo Expediente Vinculado)')
     st.markdown(
-        "<p style='color: #94A3B8;'>Si el cadete presenta un nuevo certificado"
-        ' médico extendiendo sus días de reposo o un nuevo parte, registre aquí'
-        ' la ampliación del expediente.</p>',
+        "<p style='color: #94A3B8;'>Si el cadete presenta una prórroga, se generará un <b>nuevo número de expediente</b> que quedará vinculado de forma oficial al expediente original del legajo.</p>",
         unsafe_allow_html=True,
     )
     if not df_pendientes.empty:
@@ -1702,101 +1020,115 @@ elif menu == '3. Control de Alta':
           df_pendientes['id_legajo'].astype(str)
           + ' - '
           + df_pendientes['apellido_nombre']
-          + ' (Exp: '
+          + ' (Exp Orig: '
           + df_pendientes['nro_expediente']
           + ')'
       ).tolist()
       sel_ext = st.selectbox(
-          'Seleccione Expediente / Cadete para Extender Reposo',
+          'Seleccione Expediente / Cadete para Prórroga',
           cadetes_pendientes_lista,
+          key='sel_ext_prorr'
       )
       id_leg_ext = sel_ext.split(' - ')[0]
-      exp_ref = sel_ext.split('Exp: ')[1].split(')')[0]
+      exp_ref_orig = sel_ext.split('Exp Orig: ')[1].split(')')[0]
 
-      with st.form('form_extension_reposo'):
-        col_e1, col_e2 = st.columns(2)
+      with st.form('form_nueva_prorroga_expediente'):
+        col_e1, col_e2 = st.columns(2, gap='medium')
         with col_e1:
+          nuevo_nro_exp = st.text_input('Nuevo Número de Expediente de Prórroga* (Ej: EXP-2026-PRORROGA-02)').strip()
           nuevo_medico = st.text_input('Médico Tratante de Prórroga*')
-          nuevo_diagnostico = st.text_area(
-              'Diagnóstico / Motivo de Extensión*'
-          )
-          dias_adicionales = st.number_input(
-              'Días de Reposo Adicionales', min_value=1, max_value=90, value=7
-          )
+          dias_adicionales = st.number_input('Días de Reposo Adicionales', min_value=1, max_value=90, value=7)
         with col_e2:
           nueva_fecha_hasta = st.date_input(
               'Nueva Fecha de Finalización de Reposo',
               value=sec.ahora_local().date() + timedelta(days=7),
           )
-          nuevos_certificados = st.text_area(
-              '📄 Observaciones del Nuevo Certificado Presentado'
-          )
+          nuevo_diagnostico = st.text_area('Diagnóstico / Motivo de Prórroga*')
+
+        observaciones_prorroga = st.text_area('Observaciones del Certificado de Prórroga')
+        
+        st.markdown('#### 🔬 Examen Complementario Solicitado por Prórroga (Opcional)')
+        solicitar_ex_prorr = st.checkbox('¿Solicitar examen complementario debido a esta prórroga?', key='chk_ex_prorr')
+        detalle_ex_prorr = st.text_input('Detalle del examen para la prórroga', placeholder='Ej: Reevaluación traumatológica...', key='det_ex_prorr')
 
         uploaded_ext = st.file_uploader(
             '📎 Adjuntar PDF del Nuevo Certificado de Prórroga',
             type=['pdf'],
-            key='up_ext',
+            key='up_ext_pdf',
         )
         uploaded_ext = sec.validar_pdf(uploaded_ext)
 
-        if st.form_submit_button('Registrar Prórroga y Extender Reposo') and sec.exigir('control_alta'):
-          if nuevo_medico and nuevo_diagnostico:
+        st.markdown('<br>', unsafe_allow_html=True)
+        if st.form_submit_button('💾 Generar Nuevo Expediente Vinculado y Registrar Prórroga') and sec.exigir('control_alta'):
+          if nuevo_nro_exp and nuevo_medico and nuevo_diagnostico:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
-            _prev = cursor.execute(
-                "SELECT fecha_hasta, medicamentos FROM notas_medicas WHERE id_legajo = ?"
-                " AND nro_expediente = ? AND estado_alta = 'Pendiente'",
-                (id_leg_ext, exp_ref),
-            ).fetchone()
-            _fecha_ant = _prev[0] if _prev else 'N/D'
-            # La prórroga se ANEXA a medicamentos (antes se sobrescribía y se perdía la prescripción).
-            _nota_prorroga = f'Prórroga de {dias_adicionales} días. Motivo: {nuevo_diagnostico}'
-            _med_nuevo = f'{_prev[1]} | {_nota_prorroga}' if _prev and _prev[1] else _nota_prorroga
+            
+            try: cursor.execute("ALTER TABLE notas_medicas ADD COLUMN expediente_vinculado TEXT;")
+            except Exception: pass
+            
             cursor.execute(
-                'UPDATE notas_medicas SET fecha_hasta = ?, medicamentos = ?'
-                " WHERE id_legajo = ? AND nro_expediente = ? AND estado_alta = 'Pendiente'",
-                (str(nueva_fecha_hasta), _med_nuevo, id_leg_ext, exp_ref),
+                "UPDATE notas_medicas SET estado_alta = 'Prórroga Otorgada' WHERE id_legajo = ? AND nro_expediente = ? AND estado_alta = 'Pendiente'",
+                (id_leg_ext, exp_ref_orig)
             )
-            _prorroga_aplicada = cursor.rowcount > 0
-
-            if uploaded_ext is not None and _prorroga_aplicada:
+            
+            diag_con_vinculo = f"Prórroga de exp. {exp_ref_orig}. Motivo: {nuevo_diagnostico}"
+            if solicitar_ex_prorr and detalle_ex_prorr:
+              diag_con_vinculo += f" | ⚠️ Examen Pendiente: {detalle_ex_prorr}"
+              
+            cursor.execute(
+                """
+                INSERT INTO notas_medicas (id_legajo, nro_expediente, medico, diagnostico, tipo_reposo, fecha_desde, fecha_hasta, medicamentos, certificados_indicaciones, analisis_estudios, estado_alta, expediente_vinculado)
+                VALUES (?, ?, ?, ?, 'Prórroga', ?, ?, ?, ?, ?, 'Pendiente', ?)
+                """,
+                (
+                    id_leg_ext,
+                    nuevo_nro_exp,
+                    nuevo_medico,
+                    diag_con_vinculo,
+                    str(sec.ahora_local().date()),
+                    str(nueva_fecha_hasta),
+                    'Seguimiento por prórroga',
+                    observaciones_prorroga,
+                    f"Vinculado a exp: {exp_ref_orig}",
+                    f"Vinculado a {exp_ref_orig}"
+                )
+            )
+            
+            if uploaded_ext is not None:
               ext_path = os.path.join(
                   UPLOAD_DIR,
-                  sec.nombre_seguro(f'{id_leg_ext}_PRORROGA_{uploaded_ext.name}'),
+                  sec.nombre_seguro(f'{id_leg_ext}_PRORROGA_{nuevo_nro_exp}_{uploaded_ext.name}'),
               )
               with open(ext_path, 'wb') as f_ex:
                 f_ex.write(uploaded_ext.getbuffer())
               cursor.execute(
-                  'INSERT INTO legajo_documentos (id_legajo, titulo_documento,'
-                  ' tipo_documento, fecha_subida, archivo_nombre, observaciones)'
+                  'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones)'
                   ' VALUES (?, ?, ?, ?, ?, ?)',
                   (
                       id_leg_ext,
-                      f'Expediente {exp_ref} - Prórroga de Reposo',
+                      f'Expediente {nuevo_nro_exp} (Prórroga de {exp_ref_orig}) - Certificado',
                       'PDF Prórroga',
                       str(sec.ahora_local().date()),
                       ext_path,
                       nuevo_diagnostico,
                   ),
               )
+              
             conn.commit()
             conn.close()
-            if _prorroga_aplicada:
-              sec.registrar_auditoria('Control de Alta', 'UPDATE', f'Prórroga exp. {exp_ref}: fin de reposo {_fecha_ant} → {nueva_fecha_hasta} (+{dias_adicionales} días)', id_leg_ext)
-              if uploaded_ext is not None:
-                sec.registrar_auditoria('Documentos', 'INSERT', f'PDF de prórroga subido: {os.path.basename(ext_path)} (exp. {exp_ref})', id_leg_ext)
-              st.success('¡Prórroga de reposo registrada y legajo actualizado correctamente!')
-              st.rerun()
-            else:
-              st.warning('El expediente ya no figura como pendiente; no se aplicó la prórroga. Actualice la página.')
+            
+            sec.registrar_auditoria('Control de Alta', 'INSERT', f'Generación de nuevo expediente vinculado {nuevo_nro_exp} (Prórroga de {exp_ref_orig}). Examen pendiente: {detalle_ex_prorr if solicitar_ex_prorr else "Ninguno"}', id_leg_ext)
+            st.success(f'✅ ¡Nuevo expediente de prórroga ({nuevo_nro_exp}) generado y vinculado con éxito al expediente {exp_ref_orig}!')
+            st.rerun()
           else:
-            st.warning('Complete campos obligatorios (*).')
+            st.warning('Complete los campos obligatorios (*) incluyendo el nuevo número de expediente.')
     else:
-      st.info('No hay reposos activos para extender.')
+      st.info('No hay expedientes activos para extender.')
 
 elif menu == '4. Exámenes Periódicos y Anuales':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">🧪 Exámenes Periódicos y Anuales</h2>',
+      '<div class="pro-header"><p class="pro-title">🧪 Exámenes Periódicos y Anuales</p><p class="pro-subtitle">Registro de aptitud física, laboratorios, visus, electrocardiograma, DDJJ y control trimestral de Beta HCG con soporte de archivos PDF.</p></div>',
       unsafe_allow_html=True,
   )
   df_cadetes = obtener_cadetes()
@@ -1806,88 +1138,130 @@ elif menu == '4. Exámenes Periódicos y Anuales':
         + ' - '
         + df_cadetes['apellido_nombre']
     ).tolist()
-    seleccion = st.selectbox('Seleccionar Cadete', lista_cadetes)
+    seleccion = st.selectbox('Seleccionar Cadete para Examen', lista_cadetes)
     id_legajo = seleccion.split(' - ')[0]
     cadete_info = df_cadetes[
         df_cadetes['id_legajo'].astype(str) == id_legajo
     ].iloc[0]
     es_femenino = cadete_info['genero'] == 'Femenino'
-    with st.form('form_examenes'):
-      col1, col2 = st.columns(2)
+    
+    st.markdown(
+        f'<div class="profile-card"><h3 style="margin: 0; color: #FFFFFF;">{cadete_info["apellido_nombre"]}</h3><p style="margin: 0.25rem 0 0 0; color: #94A3B8;">Legajo: <b>{cadete_info["id_legajo"]}</b> | Curso: <b>{cadete_info["curso"]}</b> | Género: <b>{cadete_info["genero"]}</b></p></div>',
+        unsafe_allow_html=True,
+    )
+    
+    with st.form('form_examenes_completo', clear_on_submit=True):
+      st.markdown('### 📋 Datos Clínicos y Aptitud')
+      col1, col2 = st.columns(2, gap='medium')
       with col1:
-        ddjj = st.selectbox('DDJJ', ['Aprobada', 'Observada'])
-        visus = st.text_input('Visus')
+        anio_examen = st.text_input('Año del Examen / Ciclo', value=str(sec.ahora_local().year))
+        ddjj = st.selectbox('DDJJ de Salud', ['Aprobada', 'Observada'])
+        visus = st.text_input('Visus (Agudeza Visual)', placeholder='Ej: OD 10/10 - OI 10/10')
         hemograma = st.selectbox('Hemograma', ['Normal', 'Alterado'])
       with col2:
-        electro = st.selectbox('Electro', ['Normal', 'Patológico'])
-        aptitud = st.selectbox('Aptitud', ['Apto', 'No Apto'])
-        beta_hcg = (
-            st.selectbox(
-                'Cuantificación de Gonadotropina Coriónica Humana (Beta HCG)',
-                ['Negativo', 'Positivo', 'No Realizado'],
+        electro = st.selectbox('Electrocardiograma', ['Normal', 'Patológico'])
+        aptitud = st.selectbox('Aptitud Física Final', ['Apto', 'No Apto'])
+        
+        if es_femenino:
+          st.markdown('#### 🔬 Control Trimestral (Test de Embarazo / Beta HCG)')
+          f_beta = st.date_input('Fecha de Cuantificación Beta HCG', value=sec.ahora_local().date())
+          res_beta = st.selectbox('Resultado Beta HCG', ['Negativo', 'Positivo', 'No Realizado'])
+        else:
+          f_beta = None
+          res_beta = 'N/A'
+          
+      st.markdown('### 📎 Adjuntar Documentación en PDF por Estudio')
+      cp1, cp2 = st.columns(2, gap='medium')
+      with cp1:
+        pdf_ddjj = st.file_uploader('PDF Declaración Jurada (DDJJ)', type=['pdf'], key='pdf_ddjj')
+        pdf_visus = st.file_uploader('PDF Examen de Visus', type=['pdf'], key='pdf_visus')
+        pdf_hemo = st.file_uploader('PDF Hemograma / Laboratorio', type=['pdf'], key='pdf_hemo')
+      with cp2:
+        pdf_electro = st.file_uploader('PDF Electrocardiograma', type=['pdf'], key='pdf_electro')
+        pdf_aptitud = st.file_uploader('PDF Aptitud Física', type=['pdf'], key='pdf_aptitud')
+        if es_femenino:
+          pdf_beta = st.file_uploader('PDF Test de Embarazo (Beta HCG)', type=['pdf'], key='pdf_beta')
+        else:
+          pdf_beta = None
+          
+      st.markdown('<br>', unsafe_allow_html=True)
+      submitted_ex = st.form_submit_button('💾 Guardar Exámenes Periódicos y Archivar PDFs')
+
+    if submitted_ex and sec.exigir('examenes_periodicos'):
+      conn = sqlite3.connect(DB_NAME)
+      cursor = conn.cursor()
+      
+      cursor.execute(
+          'INSERT INTO examenes_periodicos (id_legajo, anio, ddjj_enfermedades, visus, hemograma, orina, electrocardiograma, aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?, ?, ?, ?, ?, "Normal", ?, ?, "Negativo", ?, ?)',
+          (
+              id_legajo,
+              anio_examen,
+              ddjj,
+              visus,
+              hemograma,
+              electro,
+              aptitud,
+              f"{res_beta} ({f_beta})" if es_femenino else "N/A",
+              str(sec.ahora_local()),
+          ),
+      )
+      
+      docs_a_subir = [
+          (pdf_ddjj, 'DDJJ de Salud'),
+          (pdf_visus, 'Examen de Visus'),
+          (pdf_hemo, 'Hemograma y Laboratorio'),
+          (pdf_electro, 'Electrocardiograma'),
+          (pdf_aptitud, 'Aptitud Física'),
+      ]
+      if es_femenino and pdf_beta is not None:
+        docs_a_subir.append((pdf_beta, 'Test de Embarazo Beta HCG'))
+        
+      for archivo_pdf, titulo_doc in docs_a_subir:
+        if archivo_pdf is not None:
+          val_pdf = sec.validar_pdf(archivo_pdf)
+          if val_pdf is not None:
+            path_pdf = os.path.join(UPLOAD_DIR, sec.nombre_seguro(f"{id_legajo}_{titulo_doc}_{val_pdf.name}"))
+            with open(path_pdf, 'wb') as f_p:
+              f_p.write(val_pdf.getbuffer())
+            cursor.execute(
+                'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
+                (id_legajo, f"Examen Periódico {anio_examen} - {titulo_doc}", 'Examen Anual', str(sec.ahora_local().date()), path_pdf, f"Resultado cargado con éxito")
             )
-            if es_femenino
-            else 'N/A'
-        )
-      if st.form_submit_button('Guardar Exámenes') and sec.exigir('examenes_periodicos'):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO examenes_periodicos (id_legajo, anio,'
-            ' ddjj_enfermedades, visus, hemograma, orina, electrocardiograma,'
-            " aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?,"
-            ' ?, ?, ?, ?, \'Normal\', ?, ?, \'Negativo\', ?, ?)',
-            (
-                id_legajo,
-                str(sec.ahora_local().year),
-                ddjj,
-                visus,
-                hemograma,
-                electro,
-                aptitud,
-                beta_hcg,
-                str(sec.ahora_local()),
-            ),
-        )
-        conn.commit()
-        conn.close()
-        sec.registrar_auditoria('Exámenes Periódicos', 'INSERT', 'Examen periódico anual registrado', id_legajo)
-        st.success('¡Exámenes guardados con éxito!')
+            
+      conn.commit()
+      conn.close()
+      sec.registrar_auditoria('Exámenes Periódicos', 'INSERT', f'Exámenes anuales {anio_examen} y PDFs registrados', id_legajo)
+      st.success('✅ ¡Exámenes periódicos guardados y todos los documentos PDF archivados correctamente en el legajo digital!')
 
 elif menu == '5. Historia Clínica Integral':
   st.markdown(
-      '<h2 style="color: #FFFFFF;">📁 Legajo e Historia Clínica Integral del'
-      ' Cadete</h2>',
+      '<div class="pro-header"><p class="pro-title">📁 Legajo e Historia Clínica Integral</p><p class="pro-subtitle">Informe consolidado por cadete, filtrado por año o histórico, con opciones de edición/eliminación segura y exportación a PDF oficial.</p></div>',
       unsafe_allow_html=True,
   )
   df_cadetes = obtener_cadetes()
   if not df_cadetes.empty:
-    busq_hc = st.text_input(
-        '🔍 Buscar Cadete por Apellido o Legajo para ver Historia Clínica'
-    )
+    col_hc1, col_hc2 = st.columns([2, 1])
+    with col_hc1:
+      busq_hc = st.text_input('🔍 Buscar Cadete por Apellido o Legajo', placeholder='Escriba para buscar...')
+    with col_hc2:
+      anios_disp = ['Historial Completo', '2026', '2025', '2024']
+      anio_seleccionado = st.selectbox('📅 Filtrar por Período / Año', anios_disp)
+      filtro_anio = None if anio_seleccionado == 'Historial Completo' else anio_seleccionado
+      
     df_hc_view = df_cadetes.copy()
     if busq_hc:
       busq_hc_str = str(busq_hc)
       df_hc_view = df_hc_view[
-          df_hc_view['apellido_nombre'].str.contains(
-              busq_hc_str, case=False, na=False
-          )
-          | df_hc_view['id_legajo']
-          .astype(str)
-          .str.contains(busq_hc_str, case=False, na=False)
+          df_hc_view['apellido_nombre'].str.contains(busq_hc_str, case=False, na=False)
+          | df_hc_view['id_legajo'].astype(str).str.contains(busq_hc_str, case=False, na=False)
       ]
     if not df_hc_view.empty:
-      lista_hc = (
-          df_hc_view['id_legajo'].astype(str)
-          + ' - '
-          + df_hc_view['apellido_nombre']
-      ).tolist()
-      seleccion_hc = st.selectbox('Seleccione el Cadete de la Lista', lista_hc)
+      lista_hc = (df_hc_view['id_legajo'].astype(str) + ' - ' + df_hc_view['apellido_nombre']).tolist()
+      seleccion_hc = st.selectbox('Seleccione el Cadete', lista_hc)
       id_leg_hc = seleccion_hc.split(' - ')[0]
-      sec.auditar_vista('Historia Clínica', 'Consulta de historia clínica', id_leg_hc)
-      cad_hc = df_cadetes[
-          df_cadetes['id_legajo'].astype(str) == id_leg_hc
-      ].iloc[0]
+      sec.auditar_vista('Historia Clínica', f'Consulta historia clínica (Filtro: {anio_seleccionado})', id_leg_hc)
+      cad_hc = df_cadetes[df_cadetes['id_legajo'].astype(str) == id_leg_hc].iloc[0]
+      
       st.markdown(
           '<div class="profile-card"><h2>'
           + _html.escape(str(cad_hc['apellido_nombre']))
@@ -1897,20 +1271,40 @@ elif menu == '5. Historia Clínica Integral':
           + _html.escape(str(cad_hc['curso']))
           + '</b> | DNI: <b>'
           + _html.escape(str(cad_hc['dni']))
-          + '</b></p></div>',
+          + '</b> | Período: <b>' + anio_seleccionado + '</b></p></div>',
           unsafe_allow_html=True,
       )
+      
       conn = sqlite3.connect(DB_NAME)
-      df_nm_hc = pd.read_sql_query(
-          'SELECT * FROM notas_medicas WHERE id_legajo = ?', conn, params=(id_leg_hc,)
-      )
-      df_doc_hc = pd.read_sql_query(
-          'SELECT * FROM legajo_documentos WHERE id_legajo = ?', conn, params=(id_leg_hc,)
-      )
+      df_nm_hc = pd.read_sql_query('SELECT * FROM notas_medicas WHERE id_legajo = ?', conn, params=(id_leg_hc,))
+      df_int_hc = pd.read_sql_query('SELECT * FROM primera_intervencion WHERE id_legajo = ?', conn, params=(id_leg_hc,))
+      df_doc_hc = pd.read_sql_query('SELECT * FROM legajo_documentos WHERE id_legajo = ?', conn, params=(id_leg_hc,))
       conn.close()
-      st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos')
-      if not df_nm_hc.empty:
-        for _, r in df_nm_hc.iterrows():
+      
+      if st.button('📄 Generar e Imprimir Historia Clínica en PDF Oficial (Consolidado)'):
+        pdf_hc_path = generar_pdf_historia_clinica(cad_hc, df_nm_hc, df_int_hc, filtro_anio)
+        sec.registrar_auditoria('Historia Clínica', 'EXPORT', f'Generación de PDF de Historia Clínica Completa ({anio_seleccionado})', id_leg_hc)
+        st.success('¡PDF de Historia Clínica Integral generado correctamente con todos los registros!')
+        if os.path.exists(pdf_hc_path):
+          with open(pdf_hc_path, 'rb') as f_pdf:
+            st.download_button(
+                label='⬇️ Descargar Archivo PDF de Historia Clínica',
+                data=f_pdf.read(),
+                file_name=os.path.basename(pdf_hc_path),
+                mime='application/pdf',
+                key='dl_pdf_hc_final'
+            )
+            
+      st.markdown('<br>', unsafe_allow_html=True)
+      st.markdown('### 📋 Notas Médicas, Certificados y Estudios Anexos (Gestión y Edición)')
+      
+      df_nm_vis = df_nm_hc.copy()
+      if filtro_anio and not df_nm_vis.empty:
+        df_nm_vis = df_nm_vis[df_nm_vis['fecha_desde'].astype(str).str.contains(str(filtro_anio), na=False)]
+        
+      if not df_nm_vis.empty:
+        for _, r in df_nm_vis.iterrows():
+          nota_id = int(r['id'])
           exp_no = _html.escape(str(r['nro_expediente']))
           diag = _html.escape(str(r['diagnostico']))
           med = _html.escape(str(r['medico']))
@@ -1918,43 +1312,87 @@ elif menu == '5. Historia Clínica Integral':
           f_des = _html.escape(str(r['fecha_desde']))
           f_has = _html.escape(str(r['fecha_hasta']))
           est = _html.escape(str(r['estado_alta']))
-          cert_ind = (
-              str(r['certificados_indicaciones'])
-              if pd.notna(r['certificados_indicaciones'])
-              else 'Sin anexos'
-          )
-          an_est = (
-              str(r['analisis_estudios'])
-              if pd.notna(r['analisis_estudios'])
-              else 'Sin estudios'
-          )
-          cert_ind = _html.escape(cert_ind)
-          an_est = _html.escape(an_est)
+          cert_ind = str(r['certificados_indicaciones']) if pd.notna(r['certificados_indicaciones']) else 'Sin anexos'
+          an_est = str(r['analisis_estudios']) if pd.notna(r['analisis_estudios']) else 'Sin estudios'
+          
           card_html = (
-              '<div class="profile-card" style="border-left: 4px solid #38BDF8;">'
-              '<h4>Expediente: '
-              + exp_no
-              + ' | Diagnóstico: '
-              + diag
-              + '</h4><p><b>Médico:</b> '
-              + med
-              + ' | <b>Reposo:</b> '
-              + rep
-              + ' ('
-              + f_des
-              + ' al '
-              + f_has
-              + ') | <b>Estado:</b> '
-              + est
-              + '</p><p><b>Certificados e Indicaciones:</b><br>'
-              + cert_ind
-              + '</p><p><b>Análisis y Estudios:</b><br>'
-              + an_est
-              + '</p></div>'
+              '<div class="panel" style="border-left: 4px solid #38BDF8;">'
+              '<h4>Expediente: ' + exp_no + ' | Diagnóstico: ' + diag + '</h4>'
+              '<p><b>ID Registro:</b> ' + str(nota_id) + ' | <b>Médico:</b> ' + med + ' | <b>Reposo:</b> ' + rep + ' (' + f_des + ' al ' + f_has + ') | <b>Estado:</b> ' + est + '</p>'
+              '<p><b>Certificados e Indicaciones:</b><br>' + _html.escape(cert_ind) + '</p>'
+              '<p><b>Análisis y Estudios:</b><br>' + _html.escape(an_est) + '</p></div>'
           )
           st.markdown(card_html, unsafe_allow_html=True)
+          
+          col_btn1, col_btn2 = st.columns(2)
+          with col_btn1:
+            with st.expander(f"✏️ Editar Nota / Expediente {r['nro_expediente']} (ID: {nota_id})"):
+              with st.form(f"form_edit_nota_{nota_id}"):
+                e_exp = st.text_input("Nro. Expediente", value=r['nro_expediente'], key=f"ex_{nota_id}")
+                e_med = st.text_input("Médico", value=r['medico'], key=f"me_{nota_id}")
+                e_diag = st.text_area("Diagnóstico", value=r['diagnostico'], key=f"di_{nota_id}")
+                e_tipo = st.selectbox("Tipo Reposo", ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'], index=['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'].index(r['tipo_reposo']) if r['tipo_reposo'] in ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'] else 0, key=f"ti_{nota_id}")
+                e_desde = st.date_input("Desde", value=datetime.strptime(r['fecha_desde'], '%Y-%m-%d').date() if r['fecha_desde'] else sec.ahora_local().date(), key=f"d_{nota_id}")
+                e_hasta = st.date_input("Hasta", value=datetime.strptime(r['fecha_hasta'], '%Y-%m-%d').date() if r['fecha_hasta'] else sec.ahora_local().date(), key=f"h_{nota_id}")
+                
+                if st.form_submit_button("💾 Guardar Cambios") and sec.exigir('notas_medicas'):
+                  conn = sqlite3.connect(DB_NAME)
+                  conn.execute("UPDATE notas_medicas SET nro_expediente = ?, medico = ?, diagnostico = ?, tipo_reposo = ?, fecha_desde = ?, fecha_hasta = ? WHERE id = ?",
+                               (e_exp, e_med, e_diag, e_tipo, str(e_desde), str(e_hasta), nota_id))
+                  conn.commit()
+                  conn.close()
+                  sec.registrar_auditoria('Notas Médicas', 'UPDATE', f"Actualización de nota ID {nota_id}", id_leg_hc)
+                  st.success("¡Nota médica actualizada con éxito!")
+                  st.rerun()
+          with col_btn2:
+            with st.expander(f"🗑️ Eliminar Nota {r['nro_expediente']} (ID: {nota_id})"):
+              with st.form(f"form_del_nota_{nota_id}"):
+                st.warning("⚠️ Esta acción es irreversible. Ingrese su contraseña para confirmar la eliminación.")
+                pw_conf = st.text_input("Contraseña del usuario actual", type="password", key=f"pw_del_{nota_id}")
+                if st.form_submit_button("Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
+                  usr_actual = st.session_state.get('auth_user', {})
+                  if usr_actual:
+                    conn_v = sqlite3.connect(DB_NAME)
+                    conn_v.row_factory = sqlite3.Row
+                    u_db = conn_v.execute("SELECT * FROM usuarios WHERE username = ?", (usr_actual.get('username'),)).fetchone()
+                    conn_v.close()
+                    
+                    if u_db and sec.verify_password(pw_conf, u_db['password_hash']):
+                      conn = sqlite3.connect(DB_NAME)
+                      conn.execute("DELETE FROM notas_medicas WHERE id = ?", (nota_id,))
+                      conn.commit()
+                      conn.close()
+                      sec.registrar_auditoria('Notas Médicas', 'DELETE', f"Eliminación segura de nota ID {nota_id} con contraseña confirmada", id_leg_hc)
+                      st.success("¡Nota médica eliminada correctamente!")
+                      st.rerun()
+                    else:
+                      st.error("Contraseña incorrecta. No se pudo autorizar la eliminación.")
+                  else:
+                    st.error("Sesión no válida.")
+          st.markdown('<hr style="border-color: #1C2740; margin: 1.5rem 0;">', unsafe_allow_html=True)
       else:
-        st.write('Sin notas médicas.')
+        st.info(f'No hay notas médicas registradas para el período ({anio_seleccionado}).')
+        
+      st.markdown('### 🩺 Intervenciones de Guardia Registradas')
+      df_int_vis = df_int_hc.copy()
+      if filtro_anio and not df_int_vis.empty:
+        df_int_vis = df_int_vis[df_int_vis['fecha_hora'].astype(str).str.contains(str(filtro_anio), na=False)]
+      if not df_int_vis.empty:
+        st.dataframe(df_int_vis[['id', 'fecha_hora', 'profesional_atiende', 'sintomas', 'presion', 'saturacion', 'temperatura', 'derivacion']], use_container_width=True)
+        
+        with st.form("form_del_intervencion"):
+          id_inter_del = st.number_input("ID de Intervención a eliminar por error", min_value=1, step=1)
+          if st.form_submit_button("🗑️ Eliminar Intervención de Guardia") and sec.exigir('primera_intervencion'):
+            conn = sqlite3.connect(DB_NAME)
+            conn.execute("DELETE FROM primera_intervencion WHERE id = ? AND id_legajo = ?", (int(id_inter_del), id_leg_hc))
+            conn.commit()
+            conn.close()
+            sec.registrar_auditoria('Intervención', 'DELETE', f"Eliminación de intervención ID {id_inter_del}", id_leg_hc)
+            st.success("¡Intervención eliminada con éxito!")
+            st.rerun()
+      else:
+        st.info(f'No hay atenciones de guardia para el período ({anio_seleccionado}).')
+        
       st.markdown('### 📥 Documentos en PDF Anexados al Legajo Digital')
       if not df_doc_hc.empty:
         for _, doc_row in df_doc_hc.iterrows():
@@ -1963,17 +1401,31 @@ elif menu == '5. Historia Clínica Integral':
           f_path = str(doc_row['archivo_nombre'])
           doc_id = str(doc_row['id'])
           st.markdown(f'- **{t_doc}** (Subido el {f_sub})')
-          if os.path.exists(f_path):
-            with open(f_path, 'rb') as f:
-              st.download_button(
-                  label=f'📥 Descargar PDF: {f_path}',
-                  data=f.read(),
-                  file_name=f_path,
-                  mime='application/pdf',
-                  key=f'dl_{doc_id}',
-                  on_click=sec.registrar_auditoria,
-                  args=('Documentos', 'EXPORT', f'Descarga de PDF: {os.path.basename(f_path)}', id_leg_hc),
-              )
+          c_d1, c_d2 = st.columns([2, 1])
+          with c_d1:
+            if os.path.exists(f_path):
+              with open(f_path, 'rb') as f:
+                st.download_button(
+                    label=f'📥 Descargar PDF: {os.path.basename(f_path)}',
+                    data=f.read(),
+                    file_name=os.path.basename(f_path),
+                    mime='application/pdf',
+                    key=f'dl_{doc_id}',
+                    on_click=sec.registrar_auditoria,
+                    args=('Documentos', 'EXPORT', f'Descarga de PDF: {os.path.basename(f_path)}', id_leg_hc),
+                )
+          with c_d2:
+            if st.button(f"🗑️ Borrar Archivo", key=f"del_doc_{doc_id}") and sec.exigir('notas_medicas'):
+              try:
+                if os.path.exists(f_path): os.remove(f_path)
+              except Exception: pass
+              conn = sqlite3.connect(DB_NAME)
+              conn.execute("DELETE FROM legajo_documentos WHERE id = ?", (doc_id,))
+              conn.commit()
+              conn.close()
+              sec.registrar_auditoria('Documentos', 'DELETE', f"Eliminación de documento ID {doc_id}", id_leg_hc)
+              st.success("¡Documento borrado!")
+              st.rerun()
       else:
         st.info('No hay documentos PDF en el legajo digital todavía.')
 
@@ -2139,12 +1591,6 @@ elif menu == '7. Informes y Análisis de Datos (Spark)':
 
   with spark_tab5:
     analitica.render(DB_NAME)
-
-elif menu == 'Panel de Dirección':
-  direccion.pagina_panel(DB_NAME, kpi_card, fecha_larga_es)
-
-elif menu == '10. Respaldo del Sistema':
-  direccion.pagina_respaldo(DB_NAME, UPLOAD_DIR)
 
 elif menu == '8. Gestión de Usuarios':
   sec.pagina_usuarios()
