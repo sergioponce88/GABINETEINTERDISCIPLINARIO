@@ -150,6 +150,38 @@ input, textarea, select, div[data-baseweb="select"] span, div[data-baseweb="sele
   -webkit-text-fill-color: #FFFFFF !important;
 }
 
+/* Corregir contraste en listas desplegables (selectbox popovers de Streamlit / baseweb) */
+div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"], li[role="option"] {
+  background-color: #0C1220 !important;
+  color: #FFFFFF !important;
+}
+div[data-baseweb="popover"] * {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+}
+ul[role="listbox"] li div {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+ul[role="listbox"] li:hover div, ul[role="listbox"] li[aria-selected="true"] div {
+  background-color: #1E3A8A !important;
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+
+
+/* Corrección total y absoluta para los Selectbox, Popovers y Menús desplegables de Streamlit */
+div[data-baseweb="select"] > div {
+  background-color: #0C1220 !important;
+  color: #FFFFFF !important;
+  border-color: #1C2740 !important;
+}
+div[data-baseweb="select"] * {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
 div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"], li[role="option"] {
   background-color: #0C1220 !important;
   color: #FFFFFF !important;
@@ -163,6 +195,30 @@ ul[role="listbox"] li:hover, ul[role="listbox"] li[aria-selected="true"] {
   background-color: #1E3A8A !important;
   color: #FFFFFF !important;
 }
+.stSelectbox div[data-baseweb="select"] div {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+}
+
+
+/* Corrección absoluta para calendarios (st.date_input popovers y selectores de fecha) */
+div[data-baseweb="calendar"] {
+  background-color: #0C1220 !important;
+  color: #FFFFFF !important;
+}
+div[data-baseweb="calendar"] * {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+div[data-baseweb="calendar"] button {
+  color: #FFFFFF !important;
+  background-color: #111A2E !important;
+}
+div[data-baseweb="calendar"] button:hover {
+  background-color: #3B82F6 !important;
+}
+
 </style>""", unsafe_allow_html=True)
 
 DB_NAME = 'gabinete_iesp.db'
@@ -908,7 +964,7 @@ _*(Directora del D.G.I.A.P.P.")*_
 
 elif menu == '3. Control de Alta':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide altas, gestione prórrogas con nuevo número de expediente vinculado y asigne exámenes complementarios pendientes.</p></div>',
+      '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide altas asignando su número de expediente, gestione prórrogas con nuevo expediente y asigne exámenes complementarios pendientes.</p></div>',
       unsafe_allow_html=True,
   )
 
@@ -921,7 +977,7 @@ elif menu == '3. Control de Alta':
   conn.close()
 
   alta_tab1, alta_tab2 = st.tabs([
-      '1️⃣ Convalidar Alta Médica y Exámenes Pendientes',
+      '1️⃣ Convalidar Alta Médica (Nuevo Expediente de Alta)',
       '2️⃣ Prórroga / Extensión (Nuevo Expediente Vinculado)',
   ])
 
@@ -955,9 +1011,10 @@ elif menu == '3. Control de Alta':
       with st.form('form_convalidar_alta'):
         col_a1, col_a2 = st.columns(2, gap='medium')
         with col_a1:
+          nro_exp_alta = st.text_input('Número de Expediente de Convalidación / Alta *', placeholder='Ej: EXP-2026-ALTA-01').strip()
           medico_alta = st.text_input('Médico Tratante / Matrícula que otorga el Alta *', placeholder='Ej: Dr. Gómez / MP-4521').strip()
-          fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=sec.ahora_local().date())
         with col_a2:
+          fecha_alta_efectiva = st.date_input('Fecha Efectiva de Alta', value=sec.ahora_local().date())
           observaciones_alta = st.text_area('Observaciones Clínicas de Alta / Aptitud', placeholder='Paciente recuperado, apto para retomar actividades.')
           
         st.markdown('#### 🔬 Solicitud de Examen Médico Complementario (Opcional)')
@@ -969,7 +1026,7 @@ elif menu == '3. Control de Alta':
         
         st.markdown('<br>', unsafe_allow_html=True)
         if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Registrar Pendientes') and sec.exigir('control_alta'):
-          if medico_alta:
+          if nro_exp_alta and medico_alta:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             
@@ -977,7 +1034,7 @@ elif menu == '3. Control de Alta':
             except Exception: pass
             
             estado_final_alta = 'Alta Convalidada'
-            obs_finales = observaciones_alta
+            obs_finales = f"Exp. Alta: {nro_exp_alta} | " + observaciones_alta
             if solicitar_examen and detalle_examen:
               obs_finales += f" | ⚠️ Examen Complementario PENDIENTE: {detalle_examen}"
               
@@ -989,22 +1046,22 @@ elif menu == '3. Control de Alta':
             _alta_aplicada = cursor.rowcount > 0
             
             if uploaded_alta_pdf is not None and _alta_aplicada:
-              alta_path = os.path.join(UPLOAD_DIR, sec.nombre_seguro(f"{exp_row['id_legajo']}_ALTA_{exp_row['nro_expediente']}_{uploaded_alta_pdf.name}"))
+              alta_path = os.path.join(UPLOAD_DIR, sec.nombre_seguro(f"{exp_row['id_legajo']}_ALTA_{nro_exp_alta}_{uploaded_alta_pdf.name}"))
               with open(alta_path, 'wb') as f_al:
                 f_al.write(uploaded_alta_pdf.getbuffer())
               cursor.execute('INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
-                             (exp_row['id_legajo'], f"Expediente {exp_row['nro_expediente']} - Certificado de Alta", 'PDF Alta', str(sec.ahora_local().date()), alta_path, f"Médico: {medico_alta}"))
+                             (exp_row['id_legajo'], f"Expediente {nro_exp_alta} - Certificado de Alta", 'PDF Alta', str(sec.ahora_local().date()), alta_path, f"Médico: {medico_alta}"))
             
             conn.commit()
             conn.close()
             if _alta_aplicada:
-              sec.registrar_auditoria('Control de Alta', 'UPDATE', f"Alta convalidada exp. {exp_row['nro_expediente']}. Examen pendiente: {detalle_examen if solicitar_examen else 'Ninguno'}", exp_row['id_legajo'])
-              st.success('✅ ¡Alta médica convalidada con éxito! El estado y los exámenes pendientes han sido registrados en el legajo.')
+              sec.registrar_auditoria('Control de Alta', 'UPDATE', f"Alta convalidada exp. {nro_exp_alta} (ref. original {exp_row['nro_expediente']}). Examen pendiente: {detalle_examen if solicitar_examen else 'Ninguno'}", exp_row['id_legajo'])
+              st.success(f'✅ ¡Alta médica convalidada con éxito (Exp: {nro_exp_alta})! El estado y los exámenes pendientes han sido registrados en el legajo.')
               st.rerun()
             else:
               st.warning('Este expediente ya no figura como pendiente. Actualice la página.')
           else:
-            st.warning('Debe completar el nombre o matrícula del médico que otorga el alta.')
+            st.warning('Debe completar obligatoriamente el Número de Expediente de Alta y el Médico que otorga el alta.')
     else:
       st.info('ℹ️ No hay expedientes pendientes de alta médica.')
 
@@ -1191,6 +1248,7 @@ elif menu == '4. Exámenes Periódicos y Anuales':
       conn = sqlite3.connect(DB_NAME)
       cursor = conn.cursor()
       
+      # 1. Guardar registro en la tabla examenes_periodicos
       cursor.execute(
           'INSERT INTO examenes_periodicos (id_legajo, anio, ddjj_enfermedades, visus, hemograma, orina, electrocardiograma, aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?, ?, ?, ?, ?, "Normal", ?, ?, "Negativo", ?, ?)',
           (
@@ -1206,6 +1264,7 @@ elif menu == '4. Exámenes Periódicos y Anuales':
           ),
       )
       
+      # 2. Guardar PDFs adjuntos en legajo_documentos
       docs_a_subir = [
           (pdf_ddjj, 'DDJJ de Salud'),
           (pdf_visus, 'Examen de Visus'),
@@ -1324,51 +1383,51 @@ elif menu == '5. Historia Clínica Integral':
           )
           st.markdown(card_html, unsafe_allow_html=True)
           
-          col_btn1, col_btn2 = st.columns(2)
-          with col_btn1:
-            with st.expander(f"✏️ Editar Nota / Expediente {r['nro_expediente']} (ID: {nota_id})"):
-              with st.form(f"form_edit_nota_{nota_id}"):
-                e_exp = st.text_input("Nro. Expediente", value=r['nro_expediente'], key=f"ex_{nota_id}")
-                e_med = st.text_input("Médico", value=r['medico'], key=f"me_{nota_id}")
-                e_diag = st.text_area("Diagnóstico", value=r['diagnostico'], key=f"di_{nota_id}")
-                e_tipo = st.selectbox("Tipo Reposo", ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'], index=['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'].index(r['tipo_reposo']) if r['tipo_reposo'] in ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'] else 0, key=f"ti_{nota_id}")
-                e_desde = st.date_input("Desde", value=datetime.strptime(r['fecha_desde'], '%Y-%m-%d').date() if r['fecha_desde'] else sec.ahora_local().date(), key=f"d_{nota_id}")
-                e_hasta = st.date_input("Hasta", value=datetime.strptime(r['fecha_hasta'], '%Y-%m-%d').date() if r['fecha_hasta'] else sec.ahora_local().date(), key=f"h_{nota_id}")
+          tab_ed, tab_del = st.tabs([f"✏️ Editar Expediente {r['nro_expediente']}", f"🗑️ Eliminar Expediente {r['nro_expediente']}"])
+          
+          with tab_ed:
+            with st.form(f"form_edit_nota_{nota_id}"):
+              e_exp = st.text_input("Nro. Expediente", value=r['nro_expediente'], key=f"ex_{nota_id}")
+              e_med = st.text_input("Médico", value=r['medico'], key=f"me_{nota_id}")
+              e_diag = st.text_area("Diagnóstico", value=r['diagnostico'], key=f"di_{nota_id}")
+              e_tipo = st.selectbox("Tipo Reposo", ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'], index=['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'].index(r['tipo_reposo']) if r['tipo_reposo'] in ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'] else 0, key=f"ti_{nota_id}")
+              e_desde = st.date_input("Desde", value=datetime.strptime(r['fecha_desde'], '%Y-%m-%d').date() if r['fecha_desde'] else sec.ahora_local().date(), key=f"d_{nota_id}")
+              e_hasta = st.date_input("Hasta", value=datetime.strptime(r['fecha_hasta'], '%Y-%m-%d').date() if r['fecha_hasta'] else sec.ahora_local().date(), key=f"h_{nota_id}")
+              
+              if st.form_submit_button("💾 Guardar Cambios") and sec.exigir('notas_medicas'):
+                conn = sqlite3.connect(DB_NAME)
+                conn.execute("UPDATE notas_medicas SET nro_expediente = ?, medico = ?, diagnostico = ?, tipo_reposo = ?, fecha_desde = ?, fecha_hasta = ? WHERE id = ?",
+                             (e_exp, e_med, e_diag, e_tipo, str(e_desde), str(e_hasta), nota_id))
+                conn.commit()
+                conn.close()
+                sec.registrar_auditoria('Notas Médicas', 'UPDATE', f"Actualización de nota ID {nota_id}", id_leg_hc)
+                st.success("¡Nota médica actualizada con éxito!")
+                st.rerun()
                 
-                if st.form_submit_button("💾 Guardar Cambios") and sec.exigir('notas_medicas'):
-                  conn = sqlite3.connect(DB_NAME)
-                  conn.execute("UPDATE notas_medicas SET nro_expediente = ?, medico = ?, diagnostico = ?, tipo_reposo = ?, fecha_desde = ?, fecha_hasta = ? WHERE id = ?",
-                               (e_exp, e_med, e_diag, e_tipo, str(e_desde), str(e_hasta), nota_id))
-                  conn.commit()
-                  conn.close()
-                  sec.registrar_auditoria('Notas Médicas', 'UPDATE', f"Actualización de nota ID {nota_id}", id_leg_hc)
-                  st.success("¡Nota médica actualizada con éxito!")
-                  st.rerun()
-          with col_btn2:
-            with st.expander(f"🗑️ Eliminar Nota {r['nro_expediente']} (ID: {nota_id})"):
-              with st.form(f"form_del_nota_{nota_id}"):
-                st.warning("⚠️ Esta acción es irreversible. Ingrese su contraseña para confirmar la eliminación.")
-                pw_conf = st.text_input("Contraseña del usuario actual", type="password", key=f"pw_del_{nota_id}")
-                if st.form_submit_button("Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
-                  usr_actual = st.session_state.get('auth_user', {})
-                  if usr_actual:
-                    conn_v = sqlite3.connect(DB_NAME)
-                    conn_v.row_factory = sqlite3.Row
-                    u_db = conn_v.execute("SELECT * FROM usuarios WHERE username = ?", (usr_actual.get('username'),)).fetchone()
-                    conn_v.close()
-                    
-                    if u_db and sec.verify_password(pw_conf, u_db['password_hash']):
-                      conn = sqlite3.connect(DB_NAME)
-                      conn.execute("DELETE FROM notas_medicas WHERE id = ?", (nota_id,))
-                      conn.commit()
-                      conn.close()
-                      sec.registrar_auditoria('Notas Médicas', 'DELETE', f"Eliminación segura de nota ID {nota_id} con contraseña confirmada", id_leg_hc)
-                      st.success("¡Nota médica eliminada correctamente!")
-                      st.rerun()
-                    else:
-                      st.error("Contraseña incorrecta. No se pudo autorizar la eliminación.")
+          with tab_del:
+            with st.form(f"form_del_nota_{nota_id}"):
+              st.warning("⚠️ Acción irreversible. Ingrese su contraseña de acceso para autorizar la eliminación de esta nota médica.")
+              pw_conf = st.text_input("Contraseña de usuario", type="password", key=f"pw_del_{nota_id}")
+              if st.form_submit_button("🔒 Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
+                usr_actual = st.session_state.get('auth_user', {})
+                if usr_actual:
+                  conn_v = sqlite3.connect(DB_NAME)
+                  conn_v.row_factory = sqlite3.Row
+                  u_db = conn_v.execute("SELECT * FROM usuarios WHERE username = ?", (usr_actual.get('username'),)).fetchone()
+                  conn_v.close()
+                  
+                  if u_db and sec.verify_password(pw_conf, u_db['password_hash']):
+                    conn = sqlite3.connect(DB_NAME)
+                    conn.execute("DELETE FROM notas_medicas WHERE id = ?", (nota_id,))
+                    conn.commit()
+                    conn.close()
+                    sec.registrar_auditoria('Notas Médicas', 'DELETE', f"Eliminación segura de nota ID {nota_id} con contraseña confirmada", id_leg_hc)
+                    st.success("¡Nota médica eliminada correctamente!")
+                    st.rerun()
                   else:
-                    st.error("Sesión no válida.")
+                    st.error("Contraseña incorrecta. No se pudo autorizar la eliminación.")
+                else:
+                  st.error("Sesión no válida.")
           st.markdown('<hr style="border-color: #1C2740; margin: 1.5rem 0;">', unsafe_allow_html=True)
       else:
         st.info(f'No hay notas médicas registradas para el período ({anio_seleccionado}).')
