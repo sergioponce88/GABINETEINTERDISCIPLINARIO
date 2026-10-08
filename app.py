@@ -921,29 +921,117 @@ elif menu == '3. Control de Alta':
     st.info('Sin expedientes pendientes de alta.')
 
 elif menu == '4. Exámenes Periódicos y Anuales':
-  st.markdown('## 🧪 Exámenes Periódicos')
-  df_c = obtener_cadetes()
-  if not df_c.empty:
-    sel = st.selectbox('Cadete', (df_c['id_legajo'].astype(str) + ' - ' + df_c['apellido_nombre']).tolist())
-    id_l = sel.split(' - ')[0]
-    with st.form('f_ex'):
-      ddjj = st.selectbox('DDJJ', ['Aprobada', 'Observada'])
-      visus = st.text_input('Visus')
-      hem = st.selectbox('Hemograma', ['Normal', 'Alterado'])
-      el = st.selectbox('Electro', ['Normal', 'Patológico'])
-      apt = st.selectbox('Aptitud', ['Apto', 'No Apto'])
-      if st.form_submit_button('Guardar') and sec.exigir('examenes_periodicos'):
-        conn = sqlite3.connect(DB_NAME)
-        conn.execute("INSERT INTO examenes_periodicos (id_legajo, anio, ddjj_enfermedades, visus, hemograma, orina, electrocardiograma, aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?, '2026', ?, ?, ?, 'Normal', ?, ?, 'Negativo', 'Negativo', ?)",
-                     (id_l, ddjj, visus, hem, el, apt, str(sec.ahora_local())))
-        conn.commit()
-        conn.close()
-        sec.registrar_auditoria('Exámenes', 'INSERT', 'Examen periódico guardado', id_l)
-        st.success('¡Guardado!')
+  st.markdown(
+      '<div class="pro-header"><p class="pro-title">🧪 Exámenes Periódicos y Anuales</p><p class="pro-subtitle">Registro de aptitud física, laboratorios, visus, electrocardiograma, DDJJ y control trimestral de Beta HCG con soporte de archivos PDF.</p></div>',
+      unsafe_allow_html=True,
+  )
+  df_cadetes = obtener_cadetes()
+  if not df_cadetes.empty:
+    lista_cadetes = (
+        df_cadetes['id_legajo'].astype(str)
+        + ' - '
+        + df_cadetes['apellido_nombre']
+    ).tolist()
+    seleccion = st.selectbox('Seleccionar Cadete para Examen', lista_cadetes)
+    id_legajo = seleccion.split(' - ')[0]
+    cadete_info = df_cadetes[
+        df_cadetes['id_legajo'].astype(str) == id_legajo
+    ].iloc[0]
+    es_femenino = cadete_info['genero'] == 'Femenino'
+    
+    st.markdown(
+        f'<div class="profile-card"><h3 style="margin: 0; color: #FFFFFF;">{cadete_info["apellido_nombre"]}</h3><p style="margin: 0.25rem 0 0 0; color: #94A3B8;">Legajo: <b>{cadete_info["id_legajo"]}</b> | Curso: <b>{cadete_info["curso"]}</b> | Género: <b>{cadete_info["genero"]}</b></p></div>',
+        unsafe_allow_html=True,
+    )
+    
+    with st.form('form_examenes_completo', clear_on_submit=True):
+      st.markdown('### 📋 Datos Clínicos y Aptitud')
+      col1, col2 = st.columns(2, gap='medium')
+      with col1:
+        anio_examen = st.text_input('Año del Examen / Ciclo', value=str(sec.ahora_local().year))
+        ddjj = st.selectbox('DDJJ de Salud', ['Aprobada', 'Observada'])
+        visus = st.text_input('Visus (Agudeza Visual)', placeholder='Ej: OD 10/10 - OI 10/10')
+        hemograma = st.selectbox('Hemograma', ['Normal', 'Alterado'])
+      with col2:
+        electro = st.selectbox('Electrocardiograma', ['Normal', 'Patológico'])
+        aptitud = st.selectbox('Aptitud Física Final', ['Apto', 'No Apto'])
+        
+        if es_femenino:
+          st.markdown('#### 🔬 Control Trimestral (Test de Embarazo / Beta HCG)')
+          f_beta = st.date_input('Fecha de Cuantificación Beta HCG', value=sec.ahora_local().date())
+          res_beta = st.selectbox('Resultado Beta HCG', ['Negativo', 'Positivo', 'No Realizado'])
+        else:
+          f_beta = None
+          res_beta = 'N/A'
+          
+      st.markdown('### 📎 Adjuntar Documentación en PDF por Estudio')
+      cp1, cp2 = st.columns(2, gap='medium')
+      with cp1:
+        pdf_ddjj = st.file_uploader('PDF Declaración Jurada (DDJJ)', type=['pdf'], key='pdf_ddjj')
+        pdf_visus = st.file_uploader('PDF Examen de Visus', type=['pdf'], key='pdf_visus')
+        pdf_hemo = st.file_uploader('PDF Hemograma / Laboratorio', type=['pdf'], key='pdf_hemo')
+      with cp2:
+        pdf_electro = st.file_uploader('PDF Electrocardiograma', type=['pdf'], key='pdf_electro')
+        pdf_aptitud = st.file_uploader('PDF Aptitud Física', type=['pdf'], key='pdf_aptitud')
+        if es_femenino:
+          pdf_beta = st.file_uploader('PDF Test de Embarazo (Beta HCG)', type=['pdf'], key='pdf_beta')
+        else:
+          pdf_beta = None
+          
+      st.markdown('<br>', unsafe_allow_html=True)
+      submitted_ex = st.form_submit_button('💾 Guardar Exámenes Periódicos y Archivar PDFs')
+
+    if submitted_ex:
+      conn = sqlite3.connect(DB_NAME)
+      cursor = conn.cursor()
+      
+      # 1. Guardar registro en la tabla examenes_periodicos
+      cursor.execute(
+          'INSERT INTO examenes_periodicos (id_legajo, anio, ddjj_enfermedades, visus, hemograma, orina, electrocardiograma, aptitud_fisica, toxicologico, beta_hcg, fecha_registro) VALUES (?, ?, ?, ?, ?, "Normal", ?, ?, "Negativo", ?, ?)',
+          (
+              id_legajo,
+              anio_examen,
+              ddjj,
+              visus,
+              hemograma,
+              electro,
+              aptitud,
+              f"{res_beta} ({f_beta})" if es_femenino else "N/A",
+              str(sec.ahora_local()),
+          ),
+      )
+      
+      # 2. Guardar PDFs adjuntos en legajo_documentos
+      docs_a_subir = [
+          (pdf_ddjj, 'DDJJ de Salud'),
+          (pdf_visus, 'Examen de Visus'),
+          (pdf_hemo, 'Hemograma y Laboratorio'),
+          (pdf_electro, 'Electrocardiograma'),
+          (pdf_aptitud, 'Aptitud Física'),
+      ]
+      if es_femenino and pdf_beta is not None:
+        docs_a_subir.append((pdf_beta, 'Test de Embarazo Beta HCG'))
+        
+      for archivo_pdf, titulo_doc in docs_a_subir:
+        if archivo_pdf is not None:
+          val_pdf = sec.validar_pdf(archivo_pdf)
+          if val_pdf is not None:
+            path_pdf = os.path.join(UPLOAD_DIR, sec.nombre_seguro(f"{id_legajo}_{titulo_doc}_{val_pdf.name}"))
+            with open(path_pdf, 'wb') as f_p:
+              f_p.write(val_pdf.getbuffer())
+            cursor.execute(
+                'INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida, archivo_nombre, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
+                (id_legajo, f"Examen Periódico {anio_examen} - {titulo_doc}", 'Examen Anual', str(sec.ahora_local().date()), path_pdf, f"Resultado cargado con éxito")
+            )
+            
+      conn.commit()
+      conn.close()
+      sec.registrar_auditoria('Exámenes Periódicos', 'INSERT', f'Exámenes anuales {anio_examen} y PDFs registrados', id_legajo)
+      st.success('✅ ¡Exámenes periódicos guardados y todos los documentos PDF archivados correctamente en el legajo digital!')
 
 elif menu == '5. Historia Clínica Integral':
   st.markdown(
-      '<div class="pro-header"><p class="pro-title">📁 Legajo e Historia Clínica Integral</p><p class="pro-subtitle">Informe consolidado por cadete, filtrado por año o histórico, con opciones de edición/eliminación y exportación a PDF oficial.</p></div>',
+      '<div class="pro-header"><p class="pro-title">📁 Legajo e Historia Clínica Integral</p><p class="pro-subtitle">Informe consolidado por cadete, filtrado por año o histórico, con opciones de edición/eliminación segura y exportación a PDF oficial.</p></div>',
       unsafe_allow_html=True,
   )
   df_cadetes = obtener_cadetes()
