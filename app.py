@@ -149,6 +149,26 @@ input, textarea, select, div[data-baseweb="select"] span, div[data-baseweb="sele
   background-color: #0C1220 !important;
   -webkit-text-fill-color: #FFFFFF !important;
 }
+
+/* Corregir contraste en listas desplegables (selectbox popovers de Streamlit / baseweb) */
+div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"], li[role="option"] {
+  background-color: #0C1220 !important;
+  color: #FFFFFF !important;
+}
+div[data-baseweb="popover"] * {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+}
+ul[role="listbox"] li div {
+  color: #FFFFFF !important;
+  background-color: #0C1220 !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+ul[role="listbox"] li:hover div, ul[role="listbox"] li[aria-selected="true"] div {
+  background-color: #1E3A8A !important;
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
 </style>""", unsafe_allow_html=True)
 
 DB_NAME = 'gabinete_iesp.db'
