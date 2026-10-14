@@ -1,0 +1,29 @@
+name: Despertador Supabase
+
+# Supabase (plan gratuito) pausa el proyecto tras 7 días sin actividad.
+# Este flujo hace una escritura mínima cada 3 días para mantenerlo activo.
+on:
+  schedule:
+    - cron: '0 12 */3 * *'   # 09:00 hora Argentina, cada 3 días
+  workflow_dispatch:          # botón "Run workflow" para probarlo a mano
+
+jobs:
+  latido:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Registrar latido en la base
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Falta el secret SUPABASE_DB_URL en Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+          CREATE TABLE IF NOT EXISTS latido_sistema (id INT PRIMARY KEY, ultimo TIMESTAMPTZ NOT NULL);
+          ALTER TABLE latido_sistema ENABLE ROW LEVEL SECURITY;
+          INSERT INTO latido_sistema (id, ultimo) VALUES (1, now())
+            ON CONFLICT (id) DO UPDATE SET ultimo = now();
+          SELECT 'Latido OK: ' || ultimo || ' · cadetes: ' || (SELECT count(*) FROM cadetes) FROM latido_sistema;
+          SQL
