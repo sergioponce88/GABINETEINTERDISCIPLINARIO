@@ -9,7 +9,7 @@ import db
 import expediente_historico
 import seguridad as sec
 
-TIPOS = ['ART', 'Reposo Domiciliario', 'Reposo Académico', 'Internación']
+TIPOS = ['ART', 'Reposo Domiciliario', 'Actividades Académicas', 'Internación']
 ESTADOS = ['Pendiente', 'Alta Convalidada', 'Prórroga Otorgada']
 COLS = {  # columna de la grilla → columna de notas_medicas
     'Expediente': 'nro_expediente', 'Médico / Matrícula': 'medico', 'Diagnóstico': 'diagnostico',

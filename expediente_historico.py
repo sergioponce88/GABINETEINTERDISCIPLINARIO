@@ -10,7 +10,7 @@ import streamlit as st
 import db
 import seguridad as sec
 
-TIPOS_REPOSO = ['ART', 'Reposo Domiciliario', 'Reposo Académico', 'Internación']
+TIPOS_REPOSO = ['ART', 'Reposo Domiciliario', 'Actividades Académicas', 'Internación']
 MOV = {'inicial': '📝 Formulario inicial', 'prorroga': '➕ Prórroga / más días', 'alta': '✅ Alta'}
 
 
@@ -30,6 +30,10 @@ def asegurar_columnas():
             pass
         finally:
             conn.close()
+    conn = db.conectar(sec.DB_NAME)  # renombre de tipo de reposo
+    conn.execute("UPDATE notas_medicas SET tipo_reposo = 'Actividades Académicas' WHERE tipo_reposo = 'Reposo Académico'")
+    conn.commit()
+    conn.close()
 
 
 def _notas_db(id_leg):
@@ -267,7 +271,143 @@ def _vista_lote(id_leg, lote):
         st.rerun()
 
 
+ESTADOS = ['Pendiente', 'Prórroga Otorgada', 'Alta Convalidada']
+
+
+def _f(v):
+    d = pd.to_datetime(v, errors='coerce') if v else None
+    return None if d is None or pd.isna(d) else d.date()
+
+
+def _docs_de(id_leg, exp):
+    conn = db.conectar(sec.DB_NAME)
+    df = pd.read_sql_query("SELECT * FROM legajo_documentos WHERE id_legajo = ? AND titulo_documento LIKE ?",
+                           conn, params=(id_leg, f'Expediente {exp} %'))
+    conn.close()
+    return df
+
+
+def _ejecutar(sql, params):
+    with db.transaccion(sec.DB_NAME) as cur:
+        cur.execute(sql, params)
+
+
+def _gestion_guardadas(id_leg):
+    conn = db.conectar(sec.DB_NAME)
+    df = pd.read_sql_query('SELECT * FROM notas_medicas WHERE id_legajo = ? ORDER BY fecha_desde, id', conn, params=(id_leg,))
+    conn.close()
+    if df.empty:
+        st.info('Este cadete todavía no tiene notas guardadas.')
+        return
+    etiquetas = {int(r['id']): f"Exp. {r['nro_expediente']} · {r['tipo_reposo']} · "
+                 f"{r['fecha_desde'] or '?'} → {r['fecha_hasta'] or '?'} · {r['estado_alta']}" for _, r in df.iterrows()}
+    nid = st.selectbox('Nota a corregir', list(etiquetas), format_func=etiquetas.get, key=f'gest_sel_{id_leg}')
+    r = df[df['id'] == nid].iloc[0]
+    exp = str(r['nro_expediente'])
+    t_ed, t_pdf, t_del = st.tabs(['✏️ Editar datos', '📎 PDF de este expediente', '🗑️ Eliminar'])
+
+    with t_ed:
+        with st.form(f'gest_ed_{nid}'):
+            c1, c2 = st.columns(2)
+            n_exp = c1.text_input('N° de expediente', value=exp)
+            n_med = c2.text_input('Médico / Matrícula', value=r['medico'] or '')
+            n_diag = st.text_input('Diagnóstico', value=r['diagnostico'] or '')
+            tipos = TIPOS_REPOSO + ([r['tipo_reposo']] if r['tipo_reposo'] and r['tipo_reposo'] not in TIPOS_REPOSO else [])
+            d1, d2, d3, d4 = st.columns(4)
+            n_tipo = d1.selectbox('Tipo de reposo', tipos, index=tipos.index(r['tipo_reposo']) if r['tipo_reposo'] in tipos else 0)
+            n_des = d2.date_input('Desde', value=_f(r['fecha_desde']), format='DD/MM/YYYY')
+            n_has = d3.date_input('Hasta', value=_f(r['fecha_hasta']), format='DD/MM/YYYY')
+            n_est = d4.selectbox('Estado', ESTADOS, index=ESTADOS.index(r['estado_alta']) if r['estado_alta'] in ESTADOS else 0)
+            st.markdown('**Datos del alta** (solo si el estado es *Alta Convalidada*)')
+            a1, a2 = st.columns(2)
+            n_falta = a1.date_input('Fecha de alta', value=_f(r.get('fecha_alta_efectiva')), format='DD/MM/YYYY')
+            n_malta = a2.text_input('Médico que dio el alta', value=r.get('medico_alta') or '')
+            n_obs = st.text_input('Observaciones de alta', value=r.get('observaciones_alta') or '')
+            n_exa = st.text_input('Examen complementario pendiente', value=r.get('examen_pendiente') or '')
+            guardar = st.form_submit_button('💾 Guardar cambios', type='primary')
+        if guardar and sec.exigir('notas_medicas'):
+            if not n_exp.strip() or (n_des and n_has and n_has < n_des):
+                st.error('Revisá el N° de expediente y que "Hasta" no sea anterior a "Desde".')
+            else:
+                es_alta = n_est == 'Alta Convalidada'
+                with db.transaccion(sec.DB_NAME) as cur:
+                    cur.execute(
+                        'UPDATE notas_medicas SET nro_expediente = ?, medico = ?, diagnostico = ?, tipo_reposo = ?,'
+                        ' fecha_desde = ?, fecha_hasta = ?, estado_alta = ?, fecha_alta_efectiva = ?, medico_alta = ?,'
+                        ' observaciones_alta = ?, examen_pendiente = ? WHERE id = ?',
+                        (n_exp.strip(), n_med.strip(), n_diag.strip(), n_tipo,
+                         n_des.isoformat() if n_des else None, n_has.isoformat() if n_has else None, n_est,
+                         n_falta.isoformat() if (es_alta and n_falta) else None, n_malta.strip() if es_alta else None,
+                         n_obs.strip() if es_alta else None, n_exa.strip() or None, nid))
+                    if n_exp.strip() != exp:  # mantener vínculos y títulos de PDF
+                        cur.execute('UPDATE notas_medicas SET expediente_vinculado = ? WHERE id_legajo = ? AND expediente_vinculado = ?',
+                                    (f'Vinculado a {n_exp.strip()}', id_leg, f'Vinculado a {exp}'))
+                        cur.execute("UPDATE legajo_documentos SET titulo_documento = REPLACE(titulo_documento, ?, ?)"
+                                    ' WHERE id_legajo = ? AND titulo_documento LIKE ?',
+                                    (f'Expediente {exp}', f'Expediente {n_exp.strip()}', id_leg, f'Expediente {exp} %'))
+                sec.registrar_auditoria('Notas Médicas', 'UPDATE', f'Corrección de expediente {exp}', id_leg)
+                st.session_state['hist_ok'] = f'✅ Expediente {n_exp.strip()} actualizado.'
+                st.rerun()
+
+    with t_pdf:
+        docs = _docs_de(id_leg, exp)
+        if docs.empty:
+            st.caption('Sin PDF anexados a este expediente.')
+        for _, d in docs.iterrows():
+            c1, c2, c3 = st.columns([4, 1, 1])
+            c1.markdown(f"📄 {html.escape(str(d['titulo_documento']))}")
+            datos = db.pdf_bytes(d)
+            if datos:
+                c2.download_button('⬇️ Ver', datos, file_name=str(d['archivo_nombre']).split('/')[-1],
+                                   mime='application/pdf', key=f'gest_dl_{d["id"]}')
+            if c3.button('🗑️', key=f'gest_deldoc_{d["id"]}', help='Eliminar este PDF') and sec.exigir('notas_medicas'):
+                _ejecutar('DELETE FROM legajo_documentos WHERE id = ?', (int(d['id']),))
+                sec.registrar_auditoria('Documentos', 'DELETE', f'PDF {d["titulo_documento"]}', id_leg)
+                st.rerun()
+        with st.form(f'gest_up_{nid}', clear_on_submit=True):
+            nuevos = st.file_uploader('📎 Anexar más PDF a este expediente', type=['pdf'], accept_multiple_files=True)
+            subir = st.form_submit_button('Anexar')
+        if subir and nuevos and sec.exigir('notas_medicas'):
+            asegurar_columnas()
+            with db.transaccion(sec.DB_NAME) as cur:
+                for fpdf in nuevos:
+                    if sec.validar_pdf(fpdf) is None:
+                        continue
+                    cur.execute('INSERT INTO legajo_documentos (id_legajo, titulo_documento, tipo_documento, fecha_subida,'
+                                ' archivo_nombre, observaciones, contenido) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                                (id_leg, f'Expediente {exp} · Anexo · {fpdf.name}', 'PDF Histórico',
+                                 str(sec.ahora_local().date()), sec.nombre_seguro(fpdf.name), 'Anexo posterior',
+                                 bytes(fpdf.getbuffer())))
+            sec.registrar_auditoria('Documentos', 'INSERT', f'{len(nuevos)} PDF anexados a exp. {exp}', id_leg)
+            st.rerun()
+
+    with t_del:
+        hijos = df[df.get('expediente_vinculado', pd.Series(dtype=str)).fillna('') == f'Vinculado a {exp}']
+        if not hijos.empty:
+            st.warning(f"Este expediente tiene prórrogas posteriores ({', '.join(hijos['nro_expediente'].astype(str))}). "
+                       'Eliminá primero la última.')
+        else:
+            borrar_pdf = st.checkbox('Eliminar también sus PDF', value=True, key=f'gest_dpdf_{nid}')
+            ok = st.checkbox(f'Confirmo que quiero eliminar el expediente {exp}', key=f'gest_conf_{nid}')
+            if st.button('🗑️ Eliminar definitivamente', disabled=not ok, key=f'gest_del_{nid}') and sec.exigir('notas_medicas'):
+                padre = str(r.get('expediente_vinculado') or '').replace('Vinculado a ', '').strip()
+                with db.transaccion(sec.DB_NAME) as cur:
+                    cur.execute('DELETE FROM notas_medicas WHERE id = ?', (nid,))
+                    if padre:  # el anterior vuelve a quedar abierto
+                        cur.execute("UPDATE notas_medicas SET estado_alta = 'Pendiente' WHERE id_legajo = ?"
+                                    " AND nro_expediente = ? AND estado_alta = 'Prórroga Otorgada'", (id_leg, padre))
+                    if borrar_pdf:
+                        cur.execute('DELETE FROM legajo_documentos WHERE id_legajo = ? AND titulo_documento LIKE ?',
+                                    (id_leg, f'Expediente {exp} %'))
+                sec.registrar_auditoria('Notas Médicas', 'DELETE', f'Eliminación de expediente {exp}', id_leg)
+                st.session_state['hist_ok'] = f'🗑️ Expediente {exp} eliminado.' + (f' El {padre} quedó abierto.' if padre else '')
+                st.rerun()
+
+
 def render_tab(df_cad):
+    if not st.session_state.get('hist_cols_ok'):
+        asegurar_columnas()
+        st.session_state['hist_cols_ok'] = True
     if msg := st.session_state.pop('hist_ok', None):
         st.success(msg)
     if msg := st.session_state.pop('hist_aviso', None):
@@ -289,3 +429,6 @@ def render_tab(df_cad):
     _form_movimiento(id_leg, lote, df_db)
     st.markdown('#### 2 · Revisá y guardá todo junto')
     _vista_lote(id_leg, lote)
+    st.divider()
+    st.markdown('#### 3 · Corregir o eliminar lo ya guardado')
+    _gestion_guardadas(id_leg)

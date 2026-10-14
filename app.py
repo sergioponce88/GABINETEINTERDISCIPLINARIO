@@ -221,6 +221,26 @@ div[data-baseweb="calendar"] button:hover {
   background-color: #3B82F6 !important;
 }
 
+/* Botones, bloques de código, cargador de archivos y grillas: siempre oscuros y legibles */
+.stButton > button, .stDownloadButton > button, [data-testid="stFormSubmitButton"] > button {
+  background-color: #111A2E !important; border: 1px solid #1C2740 !important; color: #FFFFFF !important;
+}
+.stButton > button:hover, .stDownloadButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {
+  border-color: #3B82F6 !important;
+}
+.stButton > button[kind="primary"], [data-testid="stFormSubmitButton"] > button[kind="primaryFormSubmit"] {
+  background-color: #2563EB !important; border-color: #2563EB !important;
+}
+[data-testid="stCode"] pre, [data-testid="stCode"] code, .stCode pre, pre code {
+  background-color: #0C1220 !important; color: #E2E8F0 !important; -webkit-text-fill-color: #E2E8F0 !important;
+}
+[data-testid="stFileUploaderDropzone"], [data-testid="stFileUploader"] section {
+  background-color: #0C1220 !important; border: 1px dashed #3B82F6 !important;
+}
+[data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderFile"] * { color: #CBD5E1 !important; }
+[data-testid="stExpander"] details, [data-testid="stExpander"] summary { background-color: #0C1220 !important; }
+[data-testid="stMetricValue"] { color: #FFFFFF !important; }
+
 </style>""", unsafe_allow_html=True)
 
 DB_NAME = 'gabinete_iesp.db'
@@ -843,7 +863,7 @@ elif menu == '2. Notas Médicas y Reposos':
         nro_exp = st.text_input('Número de Expediente* (Ej: EXP-2026-XX)')
         med = st.text_input('Médico Tratante / Matrícula*')
         diag = st.text_area('Diagnóstico Médico*')
-        tipo_rep = st.selectbox('Tipo de Reposo', ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'])
+        tipo_rep = st.selectbox('Tipo de Reposo', ['Reposo Domiciliario', 'Actividades Académicas', 'Internación', 'ART'])
       with col2:
         f_des = st.date_input('Reposo Desde', value=sec.ahora_local().date())
         f_has = st.date_input('Reposo Hasta', value=sec.ahora_local().date())
@@ -1400,7 +1420,7 @@ elif menu == '5. Historia Clínica Integral':
               e_exp = st.text_input("Nro. Expediente", value=r['nro_expediente'], key=f"ex_{nota_id}")
               e_med = st.text_input("Médico", value=r['medico'], key=f"me_{nota_id}")
               e_diag = st.text_area("Diagnóstico", value=r['diagnostico'], key=f"di_{nota_id}")
-              e_tipo = st.selectbox("Tipo Reposo", ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'], index=['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'].index(r['tipo_reposo']) if r['tipo_reposo'] in ['Reposo Domiciliario', 'Reposo Académico', 'Internación', 'ART'] else 0, key=f"ti_{nota_id}")
+              e_tipo = st.selectbox("Tipo Reposo", ['Reposo Domiciliario', 'Actividades Académicas', 'Internación', 'ART'], index=['Reposo Domiciliario', 'Actividades Académicas', 'Internación', 'ART'].index(r['tipo_reposo']) if r['tipo_reposo'] in ['Reposo Domiciliario', 'Actividades Académicas', 'Internación', 'ART'] else 0, key=f"ti_{nota_id}")
               e_desde = st.date_input("Desde", value=datetime.strptime(r['fecha_desde'], '%Y-%m-%d').date() if r['fecha_desde'] else sec.ahora_local().date(), key=f"d_{nota_id}")
               e_hasta = st.date_input("Hasta", value=datetime.strptime(r['fecha_hasta'], '%Y-%m-%d').date() if r['fecha_hasta'] else sec.ahora_local().date(), key=f"h_{nota_id}")
               
