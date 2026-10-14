@@ -581,6 +581,10 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 sec.render_sidebar_usuario()
+if db.USA_PG:
+  st.sidebar.success('🟢 Base de datos: Supabase (persistente)')
+else:
+  st.sidebar.error('🔴 Base LOCAL temporal: los datos se pierden al reiniciar. Configure SUPABASE_DB_URL en Secrets.')
 if not sec.autorizar_menu(menu):
   st.stop()
 
