@@ -1,6 +1,7 @@
 import html as _html
 import streamlit as st
 import sqlite3
+import db
 import hashlib
 import hmac
 import secrets
@@ -43,6 +44,7 @@ MENU_PERMISOS = {
     'Personal del Gabinete': 'ver_personal',
     '1. Primera Intervención': 'primera_intervencion',
     '2. Notas Médicas y Reposos': 'notas_medicas',
+    '2b. Carga Masiva de Notas / ART': 'notas_medicas',
     '3. Control de Alta': 'control_alta',
     '4. Exámenes Periódicos y Anuales': 'examenes_periodicos',
     '5. Historia Clínica Integral': 'historia_clinica',
@@ -79,8 +81,8 @@ def _ts():
     return ahora_local().strftime('%Y-%m-%d %H:%M:%S')
 
 def _conn():
-    conn = sqlite3.connect(DB_NAME, timeout=15)
-    conn.execute('PRAGMA foreign_keys = ON')
+    conn = db.conectar(DB_NAME, timeout=15)
+    conn.execute('PRAGMA foreign_keys = ON')  # ignorado en Postgres
     return conn
 
 def nombre_seguro(nombre, unico=True):
@@ -319,7 +321,7 @@ def pagina_usuarios():
                             registrar_auditoria('Usuarios', 'INSERT', f'Creación de usuario {u_nuevo} (rol: {rol_nuevo})')
                             st.success(f'¡Usuario «{u_nuevo}» creado con éxito!')
                             if auto_pw: st.info(f'Contraseña temporal: **{pw_final}**')
-                        except sqlite3.IntegrityError:
+                        except db.IntegrityError:
                             st.error('El nombre de usuario ya existe en el sistema.')
                 else:
                     st.warning('Complete los campos obligatorios (*).')

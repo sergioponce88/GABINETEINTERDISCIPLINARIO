@@ -1,6 +1,8 @@
 from datetime import datetime, date, timedelta
 import os
 import sqlite3
+import db
+import carga_masiva
 import pandas as pd
 import streamlit as st
 import html as _html
@@ -228,7 +230,7 @@ if not os.path.exists(UPLOAD_DIR):
   os.makedirs(UPLOAD_DIR)
 
 def init_db():
-  conn = sqlite3.connect(DB_NAME)
+  conn = db.conectar(DB_NAME)
   cursor = conn.cursor()
   cursor.execute('CREATE TABLE IF NOT EXISTS cadetes (id_legajo TEXT PRIMARY KEY, apellido_nombre TEXT NOT NULL, curso TEXT NOT NULL, dni TEXT, genero TEXT, fecha_nacimiento TEXT, observaciones TEXT)')
   cursor.execute('CREATE TABLE IF NOT EXISTS personal_gabinete (id_legajo_personal TEXT PRIMARY KEY, apellido_nombre TEXT NOT NULL, dni TEXT, matricula TEXT, especialidad TEXT, telefono TEXT)')
@@ -243,13 +245,13 @@ def init_db():
 init_db()
 
 def obtener_cadetes():
-    conn = sqlite3.connect(DB_NAME)
+    conn = db.conectar(DB_NAME)
     df = pd.read_sql_query('SELECT * FROM cadetes', conn)
     conn.close()
     return df
 
 def obtener_personal():
-    conn = sqlite3.connect(DB_NAME)
+    conn = db.conectar(DB_NAME)
     df = pd.read_sql_query('SELECT * FROM personal_gabinete', conn)
     conn.close()
     return df
@@ -557,6 +559,7 @@ ICONOS_MENU = {
     'Personal del Gabinete': '🧑‍⚕️',
     '1. Primera Intervención': '🩺',
     '2. Notas Médicas y Reposos': '📋',
+    '2b. Carga Masiva de Notas / ART': '⚡',
     '3. Control de Alta': '✅',
     '4. Exámenes Periódicos y Anuales': '🧪',
     '5. Historia Clínica Integral': '🗂️',
@@ -690,7 +693,7 @@ if menu == 'Dashboard General':
   )
   df_c = obtener_cadetes()
   df_p = obtener_personal()
-  conn = sqlite3.connect(DB_NAME)
+  conn = db.conectar(DB_NAME)
   df_n = pd.read_sql_query('SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN cadetes c ON n.id_legajo = c.id_legajo', conn)
   df_e = pd.read_sql_query('SELECT e.*, c.apellido_nombre, c.curso, c.genero FROM examenes_periodicos e LEFT JOIN cadetes c ON e.id_legajo = c.id_legajo', conn)
   df_i = pd.read_sql_query('SELECT i.*, c.apellido_nombre, c.curso FROM primera_intervencion i LEFT JOIN cadetes c ON i.id_legajo = c.id_legajo', conn)
@@ -808,7 +811,7 @@ elif menu == '1. Primera Intervención':
       temp = st.text_input('Temperatura (°C)')
       der = st.selectbox('Derivación', ['Clínica', 'Traumatología', 'Psicología', 'Otro'])
       if st.form_submit_button('Registrar') and sec.exigir('primera_intervencion'):
-        conn = sqlite3.connect(DB_NAME)
+        conn = db.conectar(DB_NAME)
         conn.execute('INSERT INTO primera_intervencion (id_legajo, fecha_hora, profesional_atiende, sintomas, presion, saturacion, temperatura, derivacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                      (id_leg, f_h, prof, sint, pres, sat, temp, der))
         conn.commit()
@@ -857,7 +860,7 @@ elif menu == '2. Notas Médicas y Reposos':
     if submitted_nota:
       uploaded_file_valid = sec.validar_pdf(uploaded_file)
       if nro_exp and med and diag:
-        conn = sqlite3.connect(DB_NAME)
+        conn = db.conectar(DB_NAME)
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -962,13 +965,16 @@ _*(Directora del D.G.I.A.P.P.")*_
       else:
         st.warning('Complete los campos obligatorios (*).')
 
+elif menu == '2b. Carga Masiva de Notas / ART':
+  carga_masiva.render(obtener_cadetes, EXCEL_FILE)
+
 elif menu == '3. Control de Alta':
   st.markdown(
       '<div class="pro-header"><p class="pro-title">✅ Control y Gestión de Altas Médicas</p><p class="pro-subtitle">Convalide altas asignando su número de expediente, gestione prórrogas con nuevo expediente y asigne exámenes complementarios pendientes.</p></div>',
       unsafe_allow_html=True,
   )
 
-  conn = sqlite3.connect(DB_NAME)
+  conn = db.conectar(DB_NAME)
   df_pendientes = pd.read_sql_query(
       "SELECT n.*, c.apellido_nombre, c.curso FROM notas_medicas n LEFT JOIN"
       " cadetes c ON n.id_legajo = c.id_legajo WHERE n.estado_alta = 'Pendiente'",
@@ -1027,7 +1033,7 @@ elif menu == '3. Control de Alta':
         st.markdown('<br>', unsafe_allow_html=True)
         if st.form_submit_button('💾 Convalidar Alta Médica Oficial y Registrar Pendientes') and sec.exigir('control_alta'):
           if nro_exp_alta and medico_alta:
-            conn = sqlite3.connect(DB_NAME)
+            conn = db.conectar(DB_NAME)
             cursor = conn.cursor()
             
             try: cursor.execute("ALTER TABLE notas_medicas ADD COLUMN examen_pendiente TEXT;")
@@ -1118,7 +1124,7 @@ elif menu == '3. Control de Alta':
         st.markdown('<br>', unsafe_allow_html=True)
         if st.form_submit_button('💾 Generar Nuevo Expediente Vinculado y Registrar Prórroga') and sec.exigir('control_alta'):
           if nuevo_nro_exp and nuevo_medico and nuevo_diagnostico:
-            conn = sqlite3.connect(DB_NAME)
+            conn = db.conectar(DB_NAME)
             cursor = conn.cursor()
             
             try: cursor.execute("ALTER TABLE notas_medicas ADD COLUMN expediente_vinculado TEXT;")
@@ -1245,7 +1251,7 @@ elif menu == '4. Exámenes Periódicos y Anuales':
       submitted_ex = st.form_submit_button('💾 Guardar Exámenes Periódicos y Archivar PDFs')
 
     if submitted_ex and sec.exigir('examenes_periodicos'):
-      conn = sqlite3.connect(DB_NAME)
+      conn = db.conectar(DB_NAME)
       cursor = conn.cursor()
       
       # 1. Guardar registro en la tabla examenes_periodicos
@@ -1334,7 +1340,7 @@ elif menu == '5. Historia Clínica Integral':
           unsafe_allow_html=True,
       )
       
-      conn = sqlite3.connect(DB_NAME)
+      conn = db.conectar(DB_NAME)
       df_nm_hc = pd.read_sql_query('SELECT * FROM notas_medicas WHERE id_legajo = ?', conn, params=(id_leg_hc,))
       df_int_hc = pd.read_sql_query('SELECT * FROM primera_intervencion WHERE id_legajo = ?', conn, params=(id_leg_hc,))
       df_doc_hc = pd.read_sql_query('SELECT * FROM legajo_documentos WHERE id_legajo = ?', conn, params=(id_leg_hc,))
@@ -1395,7 +1401,7 @@ elif menu == '5. Historia Clínica Integral':
               e_hasta = st.date_input("Hasta", value=datetime.strptime(r['fecha_hasta'], '%Y-%m-%d').date() if r['fecha_hasta'] else sec.ahora_local().date(), key=f"h_{nota_id}")
               
               if st.form_submit_button("💾 Guardar Cambios") and sec.exigir('notas_medicas'):
-                conn = sqlite3.connect(DB_NAME)
+                conn = db.conectar(DB_NAME)
                 conn.execute("UPDATE notas_medicas SET nro_expediente = ?, medico = ?, diagnostico = ?, tipo_reposo = ?, fecha_desde = ?, fecha_hasta = ? WHERE id = ?",
                              (e_exp, e_med, e_diag, e_tipo, str(e_desde), str(e_hasta), nota_id))
                 conn.commit()
@@ -1411,13 +1417,13 @@ elif menu == '5. Historia Clínica Integral':
               if st.form_submit_button("🔒 Confirmar Eliminación Segura") and sec.exigir('notas_medicas'):
                 usr_actual = st.session_state.get('auth_user', {})
                 if usr_actual:
-                  conn_v = sqlite3.connect(DB_NAME)
+                  conn_v = db.conectar(DB_NAME)
                   conn_v.row_factory = sqlite3.Row
                   u_db = conn_v.execute("SELECT * FROM usuarios WHERE username = ?", (usr_actual.get('username'),)).fetchone()
                   conn_v.close()
                   
                   if u_db and sec.verify_password(pw_conf, u_db['password_hash']):
-                    conn = sqlite3.connect(DB_NAME)
+                    conn = db.conectar(DB_NAME)
                     conn.execute("DELETE FROM notas_medicas WHERE id = ?", (nota_id,))
                     conn.commit()
                     conn.close()
@@ -1442,7 +1448,7 @@ elif menu == '5. Historia Clínica Integral':
         with st.form("form_del_intervencion"):
           id_inter_del = st.number_input("ID de Intervención a eliminar por error", min_value=1, step=1)
           if st.form_submit_button("🗑️ Eliminar Intervención de Guardia") and sec.exigir('primera_intervencion'):
-            conn = sqlite3.connect(DB_NAME)
+            conn = db.conectar(DB_NAME)
             conn.execute("DELETE FROM primera_intervencion WHERE id = ? AND id_legajo = ?", (int(id_inter_del), id_leg_hc))
             conn.commit()
             conn.close()
@@ -1478,7 +1484,7 @@ elif menu == '5. Historia Clínica Integral':
               try:
                 if os.path.exists(f_path): os.remove(f_path)
               except Exception: pass
-              conn = sqlite3.connect(DB_NAME)
+              conn = db.conectar(DB_NAME)
               conn.execute("DELETE FROM legajo_documentos WHERE id = ?", (doc_id,))
               conn.commit()
               conn.close()
@@ -1508,7 +1514,7 @@ elif menu == '6. Examen de Baja / Egreso':
       )
       estado = st.text_area('Estado de Salud al Egreso')
       if st.form_submit_button('Guardar Baja') and sec.exigir('examen_baja'):
-        conn = sqlite3.connect(DB_NAME)
+        conn = db.conectar(DB_NAME)
         cursor = conn.cursor()
         cursor.execute(
             'INSERT INTO examen_baja (id_legajo, fecha_baja, motivo,'
@@ -1526,7 +1532,7 @@ elif menu == '7. Informes y Análisis de Datos (Spark)':
       unsafe_allow_html=True,
   )
 
-  conn = sqlite3.connect(DB_NAME)
+  conn = db.conectar(DB_NAME)
   df_c_rep = pd.read_sql_query('SELECT * FROM cadetes', conn)
   df_i_rep = pd.read_sql_query(
       'SELECT i.*, c.curso, c.apellido_nombre FROM primera_intervencion i LEFT'

@@ -11,6 +11,7 @@ import hashlib
 import io
 import os
 import sqlite3
+import db
 import tempfile
 import zipfile
 from datetime import timedelta
@@ -28,7 +29,7 @@ DIAS_ALERTA_VENCIMIENTO = 3
 # Cálculo de situación (sirve a la pantalla y al PDF)
 # ---------------------------------------------------------------------------
 def _leer(db_name):
-  conn = sqlite3.connect(db_name)
+  conn = db.conectar(db_name)
   try:
     cad = pd.read_sql_query('SELECT id_legajo, apellido_nombre, curso FROM cadetes', conn)
     notas = pd.read_sql_query('SELECT * FROM notas_medicas', conn)
@@ -314,7 +315,15 @@ def pagina_panel(db_name, kpi_card, fecha_larga_es):
 # Pantalla: Respaldo del sistema
 # ---------------------------------------------------------------------------
 def _snapshot_db(db_name):
-  """Copia consistente de la base (API de backup de SQLite) como bytes."""
+  """Copia consistente de la base como bytes (.db en SQLite, .xlsx con todas las tablas en Supabase)."""
+  if db.USA_PG:
+    conn = db.conectar(db_name)
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as xw:
+      for t in ['cadetes', 'personal_gabinete', 'notas_medicas', 'primera_intervencion', 'legajo_documentos',
+                'examenes_periodicos', 'examen_baja', 'usuarios', 'auditoria_logs']:
+        pd.read_sql_query(f'SELECT * FROM {t}', conn).to_excel(xw, sheet_name=t[:31], index=False)
+    return buf.getvalue()
   fd, tmp = tempfile.mkstemp(suffix='.db')
   os.close(fd)
   try:
@@ -334,7 +343,7 @@ def generar_respaldo(db_name, upload_dir, incluir_docs):
   buf = io.BytesIO()
   n_docs = 0
   with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
-    z.writestr(os.path.basename(db_name), datos_db)
+    z.writestr('gabinete_supabase.xlsx' if db.USA_PG else os.path.basename(db_name), datos_db)
     if incluir_docs and os.path.isdir(upload_dir):
       for raiz, _, archivos in os.walk(upload_dir):
         for a in archivos:
@@ -363,7 +372,7 @@ def pagina_respaldo(db_name, upload_dir):
       'Si el sistema está alojado en Streamlit Community Cloud, el disco es temporal: los datos pueden perderse'
       ' al reiniciar la app. Descargue respaldos periódicos y guárdelos fuera del repositorio.')
 
-  conn = sqlite3.connect(db_name)
+  conn = db.conectar(db_name)
   try:
     ult = conn.execute(
         "SELECT fecha_hora, usuario FROM auditoria_logs WHERE modulo = 'Respaldo' AND accion = 'EXPORT'"
@@ -374,7 +383,7 @@ def pagina_respaldo(db_name, upload_dir):
     for t in tablas:
       try:
         conteos[t] = conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
-      except sqlite3.Error:
+      except db.Error:
         conteos[t] = 0
   finally:
     conn.close()

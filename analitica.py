@@ -8,6 +8,7 @@ import io
 import os
 import re
 import sqlite3
+import db
 import unicodedata
 import zipfile
 from collections import Counter
@@ -34,7 +35,7 @@ STOPWORDS = set(
 # ---------------------------------------------------------------------------
 @st.cache_data(show_spinner=False, ttl=600)
 def _cargar(db_name, stamp):
-  conn = sqlite3.connect(db_name)
+  conn = db.conectar(db_name)
   tablas = {
       'cad': 'SELECT * FROM cadetes',
       'inter': 'SELECT * FROM primera_intervencion',
