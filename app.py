@@ -241,6 +241,15 @@ div[data-baseweb="calendar"] button:hover {
 [data-testid="stExpander"] details, [data-testid="stExpander"] summary { background-color: #0C1220 !important; }
 [data-testid="stMetricValue"] { color: #FFFFFF !important; }
 
+/* Íconos de Streamlit: la fuente global los mostraba como texto ("arrow_down", "upload") */
+[data-testid="stIconMaterial"], span[translate="no"], .material-symbols-rounded, .material-icons,
+[data-testid="stExpanderToggleIcon"], [data-testid="stFileUploaderDropzone"] span[translate="no"] {
+  font-family: 'Material Symbols Rounded' !important;
+  font-weight: normal !important; font-style: normal !important;
+  letter-spacing: normal !important; text-transform: none !important;
+  -webkit-font-feature-settings: 'liga' !important; font-feature-settings: 'liga' !important;
+}
+
 </style>""", unsafe_allow_html=True)
 
 DB_NAME = 'gabinete_iesp.db'
