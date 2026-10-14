@@ -128,6 +128,36 @@ def _guardar(id_leg, tipo, anio, datos, resultado, alertas, pdf, titulo):
                      f'Generado por el sistema ({usuario})', pdf))
 
 
+def _eliminar(id_leg, tipo, anio, titulo):
+    with db.transaccion(sec.DB_NAME) as cur:
+        cur.execute('DELETE FROM fichas_ingreso WHERE id_legajo = ? AND tipo = ? AND anio = ?', (id_leg, tipo, str(anio)))
+        cur.execute('DELETE FROM legajo_documentos WHERE id_legajo = ? AND titulo_documento = ?', (id_leg, titulo))
+
+
+def _acciones_existente(id_leg, tipo, anio, prev, nombre, generar, titulo, detalle=''):
+    """Barra para una ficha ya guardada: reimprimir, editar (el formulario viene precargado) o eliminar."""
+    k = f'{tipo}_{id_leg}_{anio}'
+    st.markdown(f'<div class="panel" style="border-left:4px solid #10B981;padding:.7rem 1rem;margin-bottom:.6rem">'
+                f'✔️ <b>{nombre} {anio} ya registrada</b>{detalle}. Para <b>editarla</b>, corregí los campos de abajo '
+                'y volvé a guardar (se reemplaza la anterior y su PDF).</div>', unsafe_allow_html=True)
+    c1, c2, _ = st.columns([1.2, 1, 2])
+    if c1.button('🖨️ Reimprimir PDF', key=f'reimp_{k}', use_container_width=True):
+        st.session_state[f'pdf_{k}'] = generar(prev, anio)
+    with c2.popover('🗑️ Eliminar', use_container_width=True):
+        st.markdown(f'Se borra la **{nombre} {anio}** de este aspirante y su PDF archivado. No se puede deshacer.')
+        ok = st.checkbox('Confirmo la eliminación', key=f'conf_{k}')
+        if st.button('Eliminar definitivamente', type='primary', disabled=not ok, key=f'del_{k}') \
+                and sec.exigir('examenes_periodicos'):
+            _eliminar(id_leg, tipo, anio, titulo)
+            sec.registrar_auditoria('Fichas de Ingreso', 'DELETE', f'{nombre} {anio} eliminada', id_leg)
+            for key in [x for x in st.session_state.keys() if str(id_leg) in str(x)]:
+                st.session_state.pop(key, None)  # limpia el formulario precargado
+            st.session_state['fi_msg'] = f'🗑️ {nombre} {anio} eliminada.'
+            st.rerun()
+    if st.session_state.get(f'pdf_{k}'):
+        _descarga(st.session_state[f'pdf_{k}'], f'{tipo}_{anio}_{id_leg}.pdf', f'dlre_{k}')
+
+
 def _resumen(anio):
     conn = db.conectar(sec.DB_NAME)
     df = pd.read_sql_query('SELECT id_legajo, tipo, resultado, alertas, fecha_registro FROM fichas_ingreso'
@@ -488,9 +518,8 @@ def _tab_ddjj(id_leg, cad, px, anio):
     prev = _cargar(id_leg, 'DDJJ', anio) or {}
     k = f'{id_leg}_{anio}'
     if prev:
-        st.success(f"✔️ Ya tiene DDJJ {anio} registrada. Podés corregirla y volver a guardar, o reimprimirla.")
-        if st.button('🖨️ Generar PDF de la DDJJ guardada', key=f'ddjj_re_{k}'):
-            _descarga(pdf_ddjj(prev, anio), f'DDJJ_{anio}_{id_leg}.pdf', f'ddjj_dlre_{k}')
+        _acciones_existente(id_leg, 'DDJJ', anio, prev, 'Declaración Jurada', pdf_ddjj,
+                            f'Ficha de Ingreso {anio} · Declaración Jurada de Salud')
     nombre_def = (f"{px.get('APELLIDO', '')} {px.get('NOMBRES', '')}".strip() or cad['apellido_nombre'])
     g = prev.get
 
@@ -629,9 +658,8 @@ def _tab_ficha(id_leg, cad, px, anio):
     else:
         st.caption('ℹ️ Este aspirante todavía no tiene DDJJ cargada: si la cargás primero, acá vas a ver sus antecedentes.')
     if prev:
-        st.success(f"✔️ Ya tiene Ficha de Salud {anio} registrada ({prev.get('resultado', '')}). Podés corregirla o reimprimirla.")
-        if st.button('🖨️ Generar PDF de la ficha guardada', key=f'fi_re_{k}'):
-            _descarga(pdf_ficha(prev, anio), f'FichaSalud_{anio}_{id_leg}.pdf', f'fi_dlre_{k}')
+        _acciones_existente(id_leg, 'FICHA', anio, prev, 'Ficha de Salud', pdf_ficha,
+                            f'Ficha de Ingreso {anio} · Ficha de Salud / Inspección', f" ({prev.get('resultado', '')})")
 
     # Anexo A — mapa corporal interactivo (fuera del formulario para ver la vista previa en vivo)
     st.markdown('##### Anexo “A” · Inspección externa  ·  marcá cada hallazgo')
@@ -767,6 +795,8 @@ def render(obtener_cadetes, excel_path):
                 'se cargan igual que en papel, se imprimen y quedan archivadas en el legajo.</p></div>',
                 unsafe_allow_html=True)
     _asegurar()
+    if msg := st.session_state.pop('fi_msg', None):
+        st.success(msg)
     df_cad = obtener_cadetes()
     if df_cad.empty:
         st.warning('Primero cargá el padrón de cadetes (⚡ Carga Masiva → 👥 Padrón).')
