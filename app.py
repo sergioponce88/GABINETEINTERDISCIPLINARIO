@@ -3,6 +3,7 @@ import os
 import sqlite3
 import db
 import carga_masiva
+import personal
 import pandas as pd
 import streamlit as st
 import html as _html
@@ -819,12 +820,7 @@ elif menu == 'Gestión de Legajos':
     st.dataframe(df_cadetes, use_container_width=True)
 
 elif menu == 'Personal del Gabinete':
-  st.markdown('<div class="pro-header"><p class="pro-title">👥 Staff Médico</p></div>', unsafe_allow_html=True)
-  df_personal = obtener_personal()
-  if not df_personal.empty:
-    st.dataframe(df_personal, use_container_width=True)
-  else:
-    st.info('Sin personal registrado.')
+  personal.render()
 
 elif menu == '1. Primera Intervención':
   st.markdown('## 🩺 Primera Intervención en Guardia')
