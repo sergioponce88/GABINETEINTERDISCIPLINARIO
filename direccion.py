@@ -322,7 +322,8 @@ def _snapshot_db(db_name):
     with pd.ExcelWriter(buf, engine='openpyxl') as xw:
       for t in ['cadetes', 'personal_gabinete', 'notas_medicas', 'primera_intervencion', 'legajo_documentos',
                 'examenes_periodicos', 'examen_baja', 'usuarios', 'auditoria_logs']:
-        pd.read_sql_query(f'SELECT * FROM {t}', conn).to_excel(xw, sheet_name=t[:31], index=False)
+        (pd.read_sql_query(f'SELECT * FROM {t}', conn).drop(columns=['contenido'], errors='ignore')
+         .to_excel(xw, sheet_name=t[:31], index=False))
     return buf.getvalue()
   fd, tmp = tempfile.mkstemp(suffix='.db')
   os.close(fd)
@@ -344,7 +345,13 @@ def generar_respaldo(db_name, upload_dir, incluir_docs):
   n_docs = 0
   with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
     z.writestr('gabinete_supabase.xlsx' if db.USA_PG else os.path.basename(db_name), datos_db)
-    if incluir_docs and os.path.isdir(upload_dir):
+    if incluir_docs and db.USA_PG:  # PDF guardados dentro de Supabase
+      conn = db.conectar(db_name)
+      cur = conn.execute('SELECT id, id_legajo, archivo_nombre, contenido FROM legajo_documentos WHERE contenido IS NOT NULL')
+      for i, leg, nombre, cont in cur.fetchall():
+        z.writestr(f'documentos/{leg}/{i}_{os.path.basename(str(nombre))}', bytes(cont))
+        n_docs += 1
+    elif incluir_docs and os.path.isdir(upload_dir):
       for raiz, _, archivos in os.walk(upload_dir):
         for a in archivos:
           ruta = os.path.join(raiz, a)

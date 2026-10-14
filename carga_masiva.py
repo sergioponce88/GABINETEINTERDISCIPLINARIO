@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 import db
+import expediente_historico
 import seguridad as sec
 
 TIPOS = ['ART', 'Reposo Domiciliario', 'Reposo Académico', 'Internación']
@@ -209,16 +210,19 @@ def _tab_padron(excel_path):
 
 def render(obtener_cadetes, excel_path):
     st.markdown('<div class="pro-header"><p class="pro-title">⚡ Carga Masiva de Notas Médicas / ART</p>'
-                '<p class="pro-subtitle">Todas las notas de un cadete en una sola grilla, o importación por Excel.</p>'
+                '<p class="pro-subtitle">Formularios, prórrogas y altas ya ocurridos, con sus PDF, en una sola carga.</p>'
                 '</div>', unsafe_allow_html=True)
     df_cad = obtener_cadetes()
-    t1, t2, t3 = st.tabs(['🧑 Por cadete', '📄 Importar Excel', '👥 Padrón de cadetes'])
+    t0, t1, t2, t3 = st.tabs(['📚 Expediente por formularios', '🧑 Grilla rápida', '📄 Importar Excel',
+                              '👥 Padrón de cadetes'])
     with t3:
         _tab_padron(excel_path)
     if df_cad.empty:
-        for t in (t1, t2):
+        for t in (t0, t1, t2):
             t.warning('Primero cargá el padrón de cadetes (pestaña 👥).')
         return
+    with t0:
+        expediente_historico.render_tab(df_cad)
     with t1:
         _tab_por_cadete(df_cad)
     with t2:

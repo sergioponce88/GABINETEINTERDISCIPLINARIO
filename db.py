@@ -52,6 +52,31 @@ def _traducir(sql, con_params):
     return sql
 
 
+_INS_DOC = re.compile(r'INSERT\s+INTO\s+legajo_documentos\s*\(([^)]*)\)(\s*VALUES\s*\()([^)]*)\)', re.I)
+_COL_CONTENIDO = {'ok': False}
+
+
+def _con_pdf(cur, sql, params):
+    """Los módulos viejos guardan el PDF en disco (temporal en Streamlit Cloud) y la ruta en
+    legajo_documentos. Acá se agrega también el contenido a la base para que no se pierda."""
+    m = _INS_DOC.search(sql)
+    if not m or not params or 'contenido' in m.group(1):
+        return sql, params
+    cols = [c.strip() for c in m.group(1).split(',')]
+    if 'archivo_nombre' not in cols:
+        return sql, params
+    try:
+        with open(params[cols.index('archivo_nombre')], 'rb') as fh:
+            datos = fh.read()
+    except Exception:
+        return sql, params
+    if not _COL_CONTENIDO['ok']:
+        cur.execute('ALTER TABLE legajo_documentos ADD COLUMN IF NOT EXISTS contenido BYTEA')
+        _COL_CONTENIDO['ok'] = True
+    nuevo = f'INSERT INTO legajo_documentos ({m.group(1)}, contenido){m.group(2)}{m.group(3)}, ?)'
+    return sql.replace(m.group(0), nuevo, 1), params + (datos,)
+
+
 class _Cursor:
     def __init__(self, cur):
         self._c = cur
@@ -60,6 +85,7 @@ class _Cursor:
         if sql.strip().upper().startswith('PRAGMA'):
             return self
         params = tuple(params) if params else None
+        sql, params = _con_pdf(self._c, sql, params)
         self._c.execute(_traducir(sql, bool(params)), params)
         return self  # permite cur.execute(...).fetchone() como en sqlite3
 
@@ -134,6 +160,18 @@ def _nueva_pg(autocommit=True):
 @st.cache_resource(show_spinner=False)
 def _pg_compartida():
     return {'raw': _nueva_pg()}
+
+
+def pdf_bytes(fila):
+    """Contenido de un documento: primero desde la base, si no desde el disco."""
+    datos = fila.get('contenido') if hasattr(fila, 'get') else None
+    if datos is not None and not (isinstance(datos, float)):
+        return bytes(datos)
+    ruta = str(fila.get('archivo_nombre') or '')
+    if ruta and os.path.exists(ruta):
+        with open(ruta, 'rb') as fh:
+            return fh.read()
+    return None
 
 
 def conectar(db_name=None, timeout=15):

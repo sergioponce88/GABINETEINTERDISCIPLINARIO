@@ -1472,11 +1472,13 @@ elif menu == '5. Historia Clínica Integral':
           st.markdown(f'- **{t_doc}** (Subido el {f_sub})')
           c_d1, c_d2 = st.columns([2, 1])
           with c_d1:
-            if os.path.exists(f_path):
-              with open(f_path, 'rb') as f:
+            _pdf = db.pdf_bytes(doc_row)
+            if _pdf is None:
+              st.caption('⚠️ Archivo no disponible (se perdió antes de migrar a Supabase).')
+            else:
                 st.download_button(
                     label=f'📥 Descargar PDF: {os.path.basename(f_path)}',
-                    data=f.read(),
+                    data=_pdf,
                     file_name=os.path.basename(f_path),
                     mime='application/pdf',
                     key=f'dl_{doc_id}',
