@@ -101,8 +101,32 @@ class _Conn:
         pass
 
 
+def _diagnostico(e):
+    """Muestra el motivo real del fallo (sin la contraseña) y detiene la app."""
+    url = _url() or ''
+    m = re.match(r'postgres(?:ql)?://([^:@/]+)(?::[^@]*)?@([^:/]+)(?::(\d+))?', url)
+    usuario, host, puerto = (m.groups() if m else ('?', '?', '?'))
+    msg = str(e).replace(url, '***')
+    st.error('🔴 No se pudo conectar a Supabase.')
+    st.code(f'Usuario: {usuario}\nHost: {host}\nPuerto: {puerto}\n\nMotivo: {msg.strip()}')
+    pistas = {
+        'password authentication failed': 'Contraseña incorrecta. Si tiene ? @ # / : escríbalos como %3F %40 %23 %2F %3A.',
+        'Tenant or user not found': 'Usuario/host no coinciden: copie de nuevo la URL desde Supabase → Connect → Session pooler.',
+        'could not translate host name': 'Host mal escrito o URL incompleta.',
+        'timeout': 'Tiempo agotado: verifique host y puerto (5432 session pooler).',
+        'invalid dsn': 'La URL no tiene formato válido (revise comillas y que esté en una sola línea).',
+    }
+    for k, v in pistas.items():
+        if k.lower() in msg.lower():
+            st.info(v)
+    st.stop()
+
+
 def _nueva_pg(autocommit=True):
-    raw = psycopg2.connect(_url(), connect_timeout=10, sslmode='require')
+    try:
+        raw = psycopg2.connect(_url(), connect_timeout=10, sslmode='require')
+    except psycopg2.Error as e:
+        _diagnostico(e)
     raw.autocommit = autocommit
     return raw
 
