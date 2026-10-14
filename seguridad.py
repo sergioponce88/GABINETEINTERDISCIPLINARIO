@@ -47,6 +47,7 @@ MENU_PERMISOS = {
     '2b. Carga Masiva de Notas / ART': 'notas_medicas',
     '3. Control de Alta': 'control_alta',
     '4. Exámenes Periódicos y Anuales': 'examenes_periodicos',
+    '4b. Fichas de Ingreso (DDJJ y Ficha de Salud)': 'examenes_periodicos',
     '5. Historia Clínica Integral': 'historia_clinica',
     '6. Examen de Baja / Egreso': 'examen_baja',
     '7. Informes y Análisis de Datos (Spark)': 'informes',

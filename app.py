@@ -4,6 +4,7 @@ import sqlite3
 import db
 import carga_masiva
 import personal
+import fichas_ingreso
 import pandas as pd
 import streamlit as st
 import html as _html
@@ -592,6 +593,7 @@ ICONOS_MENU = {
     '2b. Carga Masiva de Notas / ART': '⚡',
     '3. Control de Alta': '✅',
     '4. Exámenes Periódicos y Anuales': '🧪',
+    '4b. Fichas de Ingreso (DDJJ y Ficha de Salud)': '🗂️',
     '5. Historia Clínica Integral': '🗂️',
     '6. Examen de Baja / Egreso': '🚪',
     '7. Informes y Análisis de Datos (Spark)': '📈',
@@ -1326,6 +1328,9 @@ elif menu == '4. Exámenes Periódicos y Anuales':
       conn.close()
       sec.registrar_auditoria('Exámenes Periódicos', 'INSERT', f'Exámenes anuales {anio_examen} y PDFs registrados', id_legajo)
       st.success('✅ ¡Exámenes periódicos guardados y todos los documentos PDF archivados correctamente en el legajo digital!')
+
+elif menu == '4b. Fichas de Ingreso (DDJJ y Ficha de Salud)':
+  fichas_ingreso.render(obtener_cadetes, EXCEL_FILE)
 
 elif menu == '5. Historia Clínica Integral':
   st.markdown(
