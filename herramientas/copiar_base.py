@@ -28,6 +28,15 @@ def _limpiar(txt):
     return txt.split()[0].strip("\"'") if txt else ""
 
 
+def _pedir(texto):
+    """Pide una dirección; si llega vacía (Enter de más al pegar) la vuelve a pedir."""
+    while True:
+        url = _limpiar(input(texto))
+        if url:
+            print(f"   ✔ recibida: {_oculta(url)}\n")
+            return url
+
+
 def _oculta(url):
     if "://" in url and "@" in url:
         pre, resto = url.split("://", 1)
@@ -119,8 +128,8 @@ def contar(cur, t):
 def main():
     print("=== Copia completa de base Supabase (estructura + datos) ===\n")
     print("Pegue cada dirección con clic derecho (o Ctrl+V) y apriete Enter.\n")
-    origen = _limpiar(input("Dirección de la base VIEJA: "))
-    destino = _limpiar(input("Dirección de la base NUEVA: "))
+    origen = _pedir("Dirección de la base VIEJA: ")
+    destino = _pedir("Dirección de la base NUEVA: ")
     os.system("cls" if os.name == "nt" else "clear")
     print("=== Copia completa de base Supabase (estructura + datos) ===\n")
     for nombre, url in (("VIEJA", origen), ("NUEVA", destino)):
